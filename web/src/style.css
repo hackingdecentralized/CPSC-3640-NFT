@@ -30,7 +30,9 @@ body {
 /* ---- header ---- */
 .masthead { text-align: center; margin-bottom: 32px; }
 .masthead h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: 0.5px; }
-.masthead p { margin: 0 auto; max-width: 46ch; color: var(--muted); font-size: 15px; }
+/* Wide enough for the course title to sit on one line on desktop. It still wraps
+   on narrow screens, where one line would not fit anyway. */
+.masthead p { margin: 0 auto; max-width: 70ch; color: var(--muted); font-size: 15px; }
 .term {
   display: inline-block; margin-top: 12px; padding: 4px 14px;
   border: 1px solid var(--amber-dim); border-radius: 999px;
@@ -57,7 +59,10 @@ body {
 .steps li[data-state="done"] .n { background: var(--sage); color: #10241c; }
 
 /* ---- layout ---- */
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+/* Each column keeps its natural height and sits centred against the other. Forcing
+   them to a shared height turns the shorter one into a mostly empty box, and the
+   panel is far shorter than the artwork in the connect and not-deployed stages. */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: center; }
 @media (max-width: 780px) { .grid { grid-template-columns: 1fr; } }
 
 .card {
