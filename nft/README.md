@@ -6,16 +6,18 @@ no web server, no IPFS pin, and no dependence on this repository continuing to e
 
 ## Design
 
-A 1024x1024 square. An original geometric drawing of a bulldog on a charcoal ground,
-wearing a collar built from linked blocks, over the course's organising idea:
+A 1024x1024 square. An original drawing of a bulldog on a charcoal ground, wearing a
+collar built from linked blocks, over the course's organising idea:
 
 ```
 HUMAN  <->  BLOCKCHAIN / CONTRACT  <->  AI
 ```
 
-The bulldog nods to Handsome Dan. It is drawn from scratch as flat vector shapes; no
-existing illustration was traced or copied, and the Yale seal does not appear. The
-metadata says plainly that this is a course collectible and not an academic credential.
+The bulldog nods to Handsome Dan: broad flat crown, squared jaw flaring at the cheeks,
+folded rose ears, hanging flews with an underbite, and a brown patch over one eye. It is
+drawn from scratch as vector shapes with gradient shading; no existing illustration was
+traced or copied, and the Yale seal does not appear. The metadata says plainly that this
+is a course collectible and not an academic credential.
 
 ## Editing it
 
@@ -39,7 +41,7 @@ fails the suite rather than shipping a contract whose artwork is a version behin
 
 ## Size
 
-The SVG is roughly 6.7 KB, and the deployed contract is about 13.5 KB against the
+The SVG is roughly 8.4 KB, and the deployed contract is about 15.3 KB against the
 24,576-byte EIP-170 limit. `forge build --sizes` prints the current number, and
 `test_BytecodeFitsContractSizeLimit` fails the suite if artwork growth ever threatens
 the limit. Adding detail is fine; adding several kilobytes of it is not.
