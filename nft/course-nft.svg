@@ -33,77 +33,77 @@
 <text x='512' y='222' text-anchor='middle' font-family='Helvetica Neue,Helvetica,Arial,sans-serif' font-size='31' fill='#bdb2a0'>Decentralized Payments,</text>
 <text x='512' y='262' text-anchor='middle' font-family='Helvetica Neue,Helvetica,Arial,sans-serif' font-size='31' fill='#bdb2a0'>Contracts, and Finance</text>
 
-<circle cx='512' cy='460' r='252' fill='url(#halo)'/>
+<circle cx='512' cy='490' r='254' fill='url(#halo)'/>
 
 <g fill='#8d5a3c' stroke='#5e3a26' stroke-width='3'>
-<path d='M396 340 C352 330 328 358 334 396 C338 424 356 440 380 440 C376 406 382 368 396 340 Z'/>
-<path d='M628 340 C672 330 696 358 690 396 C686 424 668 440 644 440 C648 406 642 368 628 340 Z'/>
+<path d='M406 360 C380 344 348 354 342 380 C336 408 358 426 386 420 C387 398 394 376 406 360 Z'/>
+<path d='M618 360 C644 344 676 354 682 380 C688 408 666 426 638 420 C637 398 630 376 618 360 Z'/>
+</g>
+<g fill='none' stroke='#5e3a26' stroke-width='2.5' opacity='0.7' stroke-linecap='round'>
+<path d='M380 372 C364 384 359 404 368 416'/>
+<path d='M644 372 C660 384 665 404 656 416'/>
 </g>
 
-<path d='M512 310 C586 310 644 344 658 396 C668 434 666 464 658 488 C688 510 692 558 662 586 C634 610 576 622 512 622 C448 622 390 610 362 586 C332 558 336 510 366 488 C358 464 356 434 366 396 C380 344 438 310 512 310 Z' fill='#f4eee6' stroke='#c9bfae' stroke-width='2.5'/>
+<path d='M452 330 C490 322 534 322 572 330 C622 340 654 372 668 418 C688 470 698 518 696 558 C692 608 654 640 598 654 C570 660 542 662 512 662 C482 662 454 660 426 654 C370 640 332 608 328 558 C326 518 336 470 356 418 C370 372 402 340 452 330 Z' fill='#f4eee6' stroke='#c9bfae' stroke-width='2.5'/>
 
-<g fill='none' stroke='#d9cec0' stroke-width='4.5' stroke-linecap='round'>
-<path d='M416 396 C444 374 470 374 494 392'/>
-<path d='M608 396 C580 374 554 374 530 392'/>
-<path d='M512 364 V394'/>
-<path d='M386 446 C372 466 370 490 378 508'/>
-<path d='M638 446 C652 466 654 490 646 508'/>
+<g fill='none' stroke='#d9cec0' stroke-linecap='round'>
+<path d='M512 380 V422' stroke-width='7'/>
+<path d='M400 412 C432 386 470 386 496 410' stroke-width='6'/>
+<path d='M624 412 C592 386 554 386 528 410' stroke-width='6'/>
+<path d='M362 476 C350 500 349 526 358 548' stroke-width='4.5'/>
+<path d='M662 476 C674 500 675 526 666 548' stroke-width='4.5'/>
 </g>
 
 <g fill='#16233a'>
-<ellipse cx='446' cy='432' rx='19' ry='17'/><ellipse cx='578' cy='432' rx='19' ry='17'/>
+<ellipse cx='430' cy='456' rx='16' ry='15'/><ellipse cx='594' cy='456' rx='16' ry='15'/>
 </g>
 <g fill='#ffffff' opacity='0.9'>
-<circle cx='453' cy='426' r='6'/><circle cx='585' cy='426' r='6'/>
+<circle cx='436' cy='451' r='5'/><circle cx='600' cy='451' r='5'/>
 </g>
 
-<path d='M512 470 C576 470 618 498 618 538 C618 578 570 602 512 602 C454 602 406 578 406 538 C406 498 448 470 512 470 Z' fill='#fbf7f1' stroke='#c9bfae' stroke-width='2'/>
-<g fill='none' stroke='#d9cec0' stroke-width='3.5' stroke-linecap='round'>
-<path d='M450 516 C424 542 416 572 422 596'/>
-<path d='M574 516 C600 542 608 572 602 596'/>
-</g>
+<path d='M512 472 C578 472 626 502 630 542 C634 580 628 608 606 626 C584 644 548 646 530 628 C522 620 516 614 512 608 C508 614 502 620 494 628 C476 646 440 644 418 626 C396 608 390 580 394 542 C398 502 446 472 512 472 Z' fill='#fbf7f1' stroke='#c9bfae' stroke-width='2'/>
 
-<path d='M512 476 C548 476 570 490 570 507 C570 527 544 538 512 538 C480 538 454 527 454 507 C454 490 476 476 512 476 Z' fill='#191920'/>
+<path d='M512 484 C554 484 578 502 578 522 C578 544 548 558 512 558 C476 558 446 544 446 522 C446 502 470 484 512 484 Z' fill='#191920'/>
 <g fill='#4a4a58'>
-<ellipse cx='490' cy='505' rx='6.5' ry='9' transform='rotate(-18 490 505)'/>
-<ellipse cx='534' cy='505' rx='6.5' ry='9' transform='rotate(18 534 505)'/>
+<ellipse cx='484' cy='520' rx='7' ry='10' transform='rotate(-20 484 520)'/>
+<ellipse cx='540' cy='520' rx='7' ry='10' transform='rotate(20 540 520)'/>
 </g>
 
-<g fill='none' stroke='#8d8275' stroke-width='4.5' stroke-linecap='round'>
-<path d='M512 538 V562'/>
-<path d='M512 562 C482 590 438 586 422 556'/>
-<path d='M512 562 C542 590 586 586 602 556'/>
+<g fill='none' stroke='#8d8275' stroke-linecap='round'>
+<path d='M512 558 V590' stroke-width='5'/>
+<path d='M512 590 C488 584 456 590 428 606' stroke-width='4.5'/>
+<path d='M512 590 C536 584 568 590 596 606' stroke-width='4.5'/>
 </g>
 <g fill='#ffffff'>
-<path d='M478 566 L486 546 L494 566 Z'/><path d='M530 566 L538 546 L546 566 Z'/>
+<path d='M474 598 L484 572 L494 598 Z'/><path d='M530 598 L540 572 L550 598 Z'/>
 </g>
-<path d='M494 568 C494 592 530 592 530 568 Z' fill='#ff8fa3'/>
+<path d='M498 592 C498 618 526 618 526 592 Z' fill='#ff8fa3'/>
 
-<rect x='396' y='628' width='232' height='44' rx='15' fill='#242129' stroke='#6fbf9b' stroke-width='3'/>
+<rect x='402' y='664' width='220' height='34' rx='12' fill='#242129' stroke='#6fbf9b' stroke-width='3'/>
 <g fill='none' stroke='#6fbf9b' stroke-width='2.5'>
-<rect x='430' y='639' width='22' height='22' rx='5'/>
-<rect x='476' y='639' width='22' height='22' rx='5'/>
-<rect x='522' y='639' width='22' height='22' rx='5'/>
-<rect x='568' y='639' width='22' height='22' rx='5'/>
-<path d='M452 650 H476'/><path d='M498 650 H522'/><path d='M544 650 H568'/>
+<rect x='442' y='671' width='17' height='17' rx='4'/>
+<rect x='482' y='671' width='17' height='17' rx='4'/>
+<rect x='522' y='671' width='17' height='17' rx='4'/>
+<rect x='562' y='671' width='17' height='17' rx='4'/>
+<path d='M459 679 H482'/><path d='M499 679 H522'/><path d='M539 679 H562'/>
 </g>
 
 <g font-family='Helvetica Neue,Helvetica,Arial,sans-serif' font-weight='600' fill='#f6f0e4'>
-<rect x='118' y='702' width='196' height='74' rx='37' fill='#272430' stroke='#e8a33d' stroke-width='2.5'/>
-<text x='216' y='748' text-anchor='middle' font-size='26' letter-spacing='4'>HUMAN</text>
-<rect x='372' y='702' width='280' height='74' rx='16' fill='#242129' stroke='#6fbf9b' stroke-width='2.5'/>
-<text x='512' y='734' text-anchor='middle' font-size='23' letter-spacing='3'>BLOCKCHAIN</text>
-<text x='512' y='762' text-anchor='middle' font-size='23' letter-spacing='3'>CONTRACT</text>
-<rect x='710' y='702' width='196' height='74' rx='37' fill='#2e2415' stroke='#e8a33d' stroke-width='2.5'/>
-<text x='808' y='750' text-anchor='middle' font-size='30' fill='#f7dfae' letter-spacing='10'>AI</text>
+<rect x='118' y='706' width='196' height='74' rx='37' fill='#272430' stroke='#e8a33d' stroke-width='2.5'/>
+<text x='216' y='752' text-anchor='middle' font-size='26' letter-spacing='4'>HUMAN</text>
+<rect x='372' y='706' width='280' height='74' rx='16' fill='#242129' stroke='#6fbf9b' stroke-width='2.5'/>
+<text x='512' y='738' text-anchor='middle' font-size='23' letter-spacing='3'>BLOCKCHAIN</text>
+<text x='512' y='766' text-anchor='middle' font-size='23' letter-spacing='3'>CONTRACT</text>
+<rect x='710' y='706' width='196' height='74' rx='37' fill='#2e2415' stroke='#e8a33d' stroke-width='2.5'/>
+<text x='808' y='754' text-anchor='middle' font-size='30' fill='#f7dfae' letter-spacing='10'>AI</text>
 </g>
 <g stroke='#6fbf9b' stroke-width='3' fill='#6fbf9b'>
-<path d='M332 739 H354' stroke-linecap='round'/>
-<path d='M341 730 L326 739 L341 748 Z' stroke='none'/><path d='M345 730 L360 739 L345 748 Z' stroke='none'/>
+<path d='M332 743 H354' stroke-linecap='round'/>
+<path d='M341 734 L326 743 L341 752 Z' stroke='none'/><path d='M345 734 L360 743 L345 752 Z' stroke='none'/>
 </g>
 <g stroke='#e8a33d' stroke-width='3' fill='#e8a33d'>
-<path d='M670 739 H692' stroke-linecap='round'/>
-<path d='M679 730 L664 739 L679 748 Z' stroke='none'/><path d='M683 730 L698 739 L683 748 Z' stroke='none'/>
+<path d='M670 743 H692' stroke-linecap='round'/>
+<path d='M679 734 L664 743 L679 752 Z' stroke='none'/><path d='M683 734 L698 743 L683 752 Z' stroke='none'/>
 </g>
 
 <line x1='336' y1='832' x2='688' y2='832' stroke='url(#edge)' stroke-width='2.5'/>

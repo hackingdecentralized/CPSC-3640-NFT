@@ -39,7 +39,7 @@ fails the suite rather than shipping a contract whose artwork is a version behin
 
 ## Size
 
-The SVG is roughly 6.4 KB, and the deployed contract is about 13.3 KB against the
+The SVG is roughly 6.7 KB, and the deployed contract is about 13.5 KB against the
 24,576-byte EIP-170 limit. `forge build --sizes` prints the current number, and
 `test_BytecodeFitsContractSizeLimit` fails the suite if artwork growth ever threatens
 the limit. Adding detail is fine; adding several kilobytes of it is not.

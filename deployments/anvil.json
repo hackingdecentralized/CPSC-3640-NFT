@@ -6,6 +6,5 @@
   "transactionHash": null,
   "merkleRoot": null,
   "deployer": null,
-  "deployedAt": null,
-  "_note": "Placeholder for local development. `node scripts/save-deployment.mjs anvil` overwrites it after a local deploy. Expect it to differ locally; there is no need to commit your local values."
+  "deployedAt": null
 }
