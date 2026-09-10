@@ -35,10 +35,10 @@ jobs:
       - name: Fail if the fixture is out of date
         run: git diff --exit-code allowlist/generated/example-tree.json
 
-      - name: Check the on-chain SVG matches nft/course-nft.svg
+      - name: Check the embedded artwork matches nft/course-nft-onchain.webp
         run: |
-          npm run embed:svg
-          git diff --exit-code contracts/CPSC3640NFT.sol
+          npm run embed:image
+          git diff --exit-code contracts/CourseArtwork.sol
 
       - name: Run tests
         run: forge test -vv

@@ -12,7 +12,8 @@
 import type {Address, Hex} from "viem";
 
 import "./style.css";
-import courseArtwork from "../../nft/course-nft.svg?raw";
+// The exact bytes the contract stores, so the preview cannot disagree with the token.
+import courseArtwork from "../../nft/course-nft-onchain.webp";
 
 import {
   CHAIN_ID,
@@ -271,7 +272,7 @@ function artwork(): string {
     </figure>`;
   }
   return `<figure class="card art">
-    ${courseArtwork}
+    <img src="${courseArtwork}" alt="CPSC 3640/5400 course NFT artwork" />
     <figcaption>Preview &mdash; the same artwork the contract stores</figcaption>
   </figure>`;
 }

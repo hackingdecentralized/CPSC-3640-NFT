@@ -1,47 +1,66 @@
 # Course NFT artwork
 
-`course-nft.svg` is the artwork, and it is also the artwork the contract stores. The
-same bytes are compiled into `CPSC3640NFT`, so a minted token renders correctly with
-no web server, no IPFS pin, and no dependence on this repository continuing to exist.
+Two files, and the difference between them matters.
 
-## Design
+| File | What it is |
+| --- | --- |
+| `course-nft.svg` | the master, 1254x1254, about 1.7 MB |
+| `course-nft-onchain.webp` | the derived 512x512 copy actually stored in the contract |
 
-A 1024x1024 square. An original drawing of a bulldog on a charcoal ground, wearing a
-collar built from linked blocks, over the course's organising idea:
+## Why there are two
+
+The whole point of this project is that the artwork lives in the contract, so a
+minted token stays valid with no IPFS pin and no web server. That puts the artwork
+under a hard ceiling: EIP-170 caps a contract's runtime bytecode at 24,576 bytes,
+and the contract logic already needs about 6.9 KB. The artwork gets roughly 17 KB.
+
+The master is about 1.7 MB, which is 73 times over that budget. Despite the `.svg`
+extension it is not vector art: it is a single 1254x1254 raster wrapped in an
+`<image>` element. So it cannot be shrunk by simplifying paths, only by
+re-encoding.
+
+Downscaling to 512x512 and encoding as WebP gets it to 14,292 bytes, which fits
+with about 3.4 KB of contract headroom to spare. At that size every line of course
+text is still legible.
+
+## Regenerating
+
+Only needed when the master changes.
+
+```bash
+pip install pillow
+python3 scripts/make-onchain-image.py   # master -> course-nft-onchain.webp
+npm run embed:image                     # webp   -> contracts/CourseArtwork.sol
+forge test                              # proves the two still match
+```
+
+`scripts/make-onchain-image.py` refuses to write a file over the 17 KB budget, and
+`npm run embed:image` refuses to embed one, so an oversized artwork fails at your
+desk rather than at deployment. `test_EmbeddedImageMatchesSourceFile` re-reads the
+`.webp` at test time and fails if the Solidity copy has drifted from it, so
+forgetting to re-embed is caught by `forge test`.
+
+To trade resolution against quality, edit `SIZE` and `QUALITY` in
+`scripts/make-onchain-image.py`. For reference, at quality 65: 384px is about
+9.7 KB, 512px about 14.3 KB, and 576px runs over budget.
+
+## What is in the picture
+
+A bulldog in a Yale bandana over the course's organising idea:
 
 ```
 HUMAN  <->  BLOCKCHAIN / CONTRACT  <->  AI
 ```
 
-The bulldog nods to Handsome Dan: broad flat crown, squared jaw flaring at the cheeks,
-folded rose ears, hanging flews with an underbite, and a brown patch over one eye. It is
-drawn from scratch as vector shapes with gradient shading; no existing illustration was
-traced or copied, and the Yale seal does not appear. The metadata says plainly that this
-is a course collectible and not an academic credential.
+with the course number, title, and term.
 
-## Editing it
+## Two things to know
 
-Two constraints, both enforced automatically:
+**It is a raster, not vector.** The previous artwork was hand-drawn SVG and stayed
+crisp at any size. This one is fixed at 512x512 on-chain and will soften on a large
+display. That is the cost of using this illustration.
 
-1. **Single quotes only.** Attributes use `'`, never `"`, so the whole file drops into
-   a Solidity string literal without escaping. `npm run embed:svg` refuses to run if a
-   double quote appears.
-2. **No backslashes.** Solidity would read them as escapes. Also refused.
-
-After any edit:
-
-```bash
-npm run embed:svg   # copy the SVG into contracts/CPSC3640NFT.sol
-forge test          # test_EmbeddedSvgMatchesSourceFile checks they match
-```
-
-`test_EmbeddedSvgMatchesSourceFile` reads this file at test time and compares it to
-what the contract returns from `rawSVG()`. Editing the SVG and forgetting to re-embed
-fails the suite rather than shipping a contract whose artwork is a version behind.
-
-## Size
-
-The SVG is roughly 8.4 KB, and the deployed contract is about 15.3 KB against the
-24,576-byte EIP-170 limit. `forge build --sizes` prints the current number, and
-`test_BytecodeFitsContractSizeLimit` fails the suite if artwork growth ever threatens
-the limit. Adding detail is fine; adding several kilobytes of it is not.
+**The bandana carries a Yale "Y".** The Yale seal does not appear and the metadata
+says plainly that this is a course collectible and not an academic credential, but
+the "Y" is a university trademark. Using it is a call for the course staff, not a
+technical question. Replace the master and regenerate if you would rather not.

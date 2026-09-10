@@ -8,9 +8,11 @@ one ERC-721 to themselves on Ethereum Sepolia. The point is to walk the whole pa
 for real: visit a page, connect a wallet, notice you are on the wrong network, fix that,
 prove eligibility, sign a transaction, wait for a block, and end up owning something.
 
-The artwork and metadata live entirely in the contract. No IPFS, no backend, no
-database. If this repository and its website vanish tomorrow, every minted token still
-returns valid metadata and renders correctly in any wallet.
+The artwork and metadata live entirely in the contract: a 512x512 WebP of about 14 KB,
+sitting in the contract's own bytecode. No IPFS, no backend, no database. If this
+repository and its website vanish tomorrow, every minted token still returns valid
+metadata and renders correctly in any wallet. See `nft/README.md` for why the artwork
+is 512x512 and not larger.
 
 > This is a collectible, not an official academic credential, and not a Yale-issued
 > anything. The metadata says so too.
@@ -22,7 +24,7 @@ returns valid metadata and renders correctly in any wallet.
                          |
         +----------------+----------------+
         |                |                |
-    Solidity         NFT SVG          Web source
+    Solidity         Artwork          Web source
         |                                 |
         v                                 v
  Ethereum Sepolia                    Vite build
@@ -57,10 +59,10 @@ contracts/CPSC3640NFT.sol      ERC-721, Merkle allowlist, on-chain metadata
 test/CPSC3640NFT.t.sol         Foundry tests
 script/Deploy.s.sol            deployment script
 deployments/                   public record of each deployment
-nft/course-nft.svg             the artwork, byte-identical to the contract's copy
+nft/course-nft.svg             master artwork; course-nft-onchain.webp is what ships on-chain
 allowlist/                     roster in, Merkle root and proofs out
 web/                           Vite + TypeScript + viem claim page
-scripts/                       SVG embedding, deployment recording, page publishing
+scripts/                       artwork embedding, deployment recording, page publishing
 ```
 
 ## Setup
@@ -118,7 +120,8 @@ transaction.
 ```bash
 npm run merkle                # build the Merkle tree from allowlist/addresses.json
 npm run merkle -- --example   # rebuild the committed test fixture
-npm run embed:svg             # copy nft/course-nft.svg into the contract
+npm run image                 # master artwork -> the 512px on-chain copy
+npm run embed:image           # that copy -> contracts/CourseArtwork.sol
 forge test -vv                # run the contract tests
 forge build --sizes           # check bytecode against the 24,576-byte limit
 npm --prefix web run dev      # claim page against Sepolia
@@ -293,8 +296,8 @@ as compromised, move the contract owner to a fresh key, and rewrite history.
 | `claim(bytes32[] proof)` | anyone on the allowlist | mints one token to the caller |
 | `canClaim(address)` | view | could this address claim right now |
 | `isEligible(address, bytes32[])` | view | does this proof verify |
-| `tokenURI(uint256)` | view | Base64 JSON with a Base64 SVG inside |
-| `rawSVG()` | view | the artwork source |
+| `tokenURI(uint256)` | view | Base64 JSON with a Base64 WebP inside |
+| `rawImage()` | view | the raw artwork bytes |
 | `setMerkleRoot(bytes32)` | owner | rotate the allowlist |
 | `setClaimOpen(bool)` | owner | open or pause claiming |
 
@@ -315,7 +318,7 @@ tokenURI(1)
          "name": "CPSC 3640/5400 - Fall 2026 #1",
          "description": "Decentralized Payments, Contracts, and Finance for Humans and AI...",
          "attributes": [ Course, Semester, Type, Network ],
-         "image": "data:image/svg+xml;base64,..."
+         "image": "data:image/webp;base64,..."
        }
 ```
 

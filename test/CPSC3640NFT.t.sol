@@ -335,40 +335,51 @@ contract CPSC3640NFTTest is Test {
         assertEq(vm.parseJsonString(_decodedMetadata(2), ".name"), "CPSC 3640/5400 - Fall 2026 #2");
     }
 
-    function test_MetadataContainsSvgDataUri() public {
+    function test_MetadataContainsImageDataUri() public {
         vm.prank(allowlisted[0]);
         nft.claim(proofs[0]);
 
         string memory image = vm.parseJsonString(_decodedMetadata(1), ".image");
-        assertTrue(_startsWith(image, "data:image/svg+xml;base64,"), "wrong image data URI prefix");
+        assertTrue(_startsWith(image, "data:image/webp;base64,"), "wrong image data URI prefix");
 
-        string memory encoded = _slice(image, bytes("data:image/svg+xml;base64,").length);
-        string memory svg = string(Base64Decode.decode(encoded));
+        string memory encoded = _slice(image, bytes("data:image/webp;base64,").length);
+        bytes memory decoded = Base64Decode.decode(encoded);
 
-        assertTrue(_startsWith(svg, "<svg"), "decoded image should be SVG markup");
-        assertEq(svg, nft.rawSVG(), "decoded image must equal the contract's SVG");
-    }
-
-    /// @notice The SVG compiled into the contract must match `nft/course-nft.svg`.
-    /// @dev This is what stops the human-editable artwork and the on-chain copy from
-    ///      drifting. If it fails, run `npm run embed:svg`.
-    function test_EmbeddedSvgMatchesSourceFile() public view {
-        bytes memory file = bytes(vm.readFile("nft/course-nft.svg"));
-
-        // The file ends with a newline; the Solidity constant does not.
-        uint256 length = file.length;
-        if (length > 0 && file[length - 1] == "\n") length--;
-
-        bytes memory trimmed = new bytes(length);
-        for (uint256 i = 0; i < length; i++) {
-            trimmed[i] = file[i];
-        }
+        // A WebP file is a RIFF container: "RIFF" <size> "WEBP".
+        assertEq(decoded[0], bytes1("R"), "missing RIFF magic");
+        assertEq(decoded[1], bytes1("I"));
+        assertEq(decoded[2], bytes1("F"));
+        assertEq(decoded[3], bytes1("F"));
+        assertEq(decoded[8], bytes1("W"), "missing WEBP magic");
+        assertEq(decoded[9], bytes1("E"));
+        assertEq(decoded[10], bytes1("B"));
+        assertEq(decoded[11], bytes1("P"));
 
         assertEq(
-            keccak256(trimmed),
-            keccak256(bytes(nft.rawSVG())),
-            "nft/course-nft.svg and the embedded SVG differ - run `npm run embed:svg`"
+            keccak256(decoded),
+            keccak256(nft.rawImage()),
+            "decoded image must equal the contract's artwork"
         );
+    }
+
+    /// @notice The image compiled into the contract must match the file on disk.
+    /// @dev This is what stops the committed artwork and the on-chain copy from
+    ///      drifting. If it fails, run `npm run embed:image`.
+    function test_EmbeddedImageMatchesSourceFile() public view {
+        bytes memory file = vm.readFileBinary("nft/course-nft-onchain.webp");
+
+        assertEq(
+            keccak256(file),
+            keccak256(nft.rawImage()),
+            "nft/course-nft-onchain.webp and the embedded image differ - run `npm run embed:image`"
+        );
+    }
+
+    /// @notice The artwork must leave room for the contract under EIP-170.
+    function test_ArtworkStaysWithinBudget() public {
+        uint256 artwork = nft.rawImage().length;
+        emit log_named_uint("artwork bytes", artwork);
+        assertLt(artwork, 17_000, "artwork has outgrown its on-chain budget");
     }
 
     // -----------------------------------------------------------------------
