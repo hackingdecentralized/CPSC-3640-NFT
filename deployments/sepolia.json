@@ -1,0 +1,11 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "contractAddress": null,
+  "deploymentBlock": 0,
+  "transactionHash": null,
+  "merkleRoot": null,
+  "deployer": null,
+  "deployedAt": null,
+  "_note": "Placeholder. Populated by `node scripts/save-deployment.mjs sepolia` after `forge script script/Deploy.s.sol --rpc-url $SEPOLIA_RPC_URL --broadcast`. While contractAddress is null the claim page renders a 'not yet deployed' notice instead of a claim button."
+}

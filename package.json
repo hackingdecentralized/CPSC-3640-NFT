@@ -1,0 +1,20 @@
+{
+  "name": "cpsc3640-nft",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CPSC 3640/5400 Course NFT - on-chain ERC-721 with a Merkle allowlist",
+  "scripts": {
+    "merkle": "tsx allowlist/generate-merkle.ts",
+    "embed:svg": "node scripts/embed-svg.mjs",
+    "test": "forge test -vv",
+    "web:dev": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run build",
+    "publish:pages": "bash scripts/publish-pages.sh"
+  },
+  "devDependencies": {
+    "@openzeppelin/merkle-tree": "^1.0.7",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

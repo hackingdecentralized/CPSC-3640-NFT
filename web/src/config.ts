@@ -1,0 +1,84 @@
+/**
+ * The one place the chain, the contract and the explorer are configured.
+ *
+ * Nothing else in the frontend hard-codes a chain id or an address. To point the
+ * page at a new deployment you update deployments/<network>.json (written by
+ * `node scripts/save-deployment.mjs`) and rebuild - you do not edit the UI code.
+ *
+ * Build for a different network with:
+ *   VITE_NETWORK=anvil npm run dev
+ */
+import {foundry, sepolia} from "viem/chains";
+import type {Chain} from "viem";
+
+import anvilDeployment from "../../deployments/anvil.json";
+import sepoliaDeployment from "../../deployments/sepolia.json";
+
+export interface Deployment {
+  network: string;
+  chainId: number;
+  /** `null` until the contract has actually been deployed to this network. */
+  contractAddress: string | null;
+  /** Block the contract was created in. Bounds the `Claimed` log query. */
+  deploymentBlock: number;
+  transactionHash: string | null;
+  merkleRoot: string | null;
+  deployer: string | null;
+}
+
+export interface NetworkConfig {
+  chain: Chain;
+  label: string;
+  /** Explorer origin, or `null` for local chains that have none. */
+  explorer: string | null;
+  deployment: Deployment;
+}
+
+const NETWORKS: Record<string, NetworkConfig> = {
+  sepolia: {
+    chain: sepolia,
+    label: "Ethereum Sepolia",
+    explorer: "https://sepolia.etherscan.io",
+    deployment: sepoliaDeployment as Deployment
+  },
+  anvil: {
+    chain: foundry,
+    label: "Local Anvil",
+    explorer: null,
+    deployment: anvilDeployment as Deployment
+  }
+};
+
+const requested = (import.meta.env.VITE_NETWORK as string | undefined) ?? "sepolia";
+const selected = NETWORKS[requested];
+
+if (!selected) {
+  throw new Error(
+    `Unknown VITE_NETWORK "${requested}". Expected one of: ${Object.keys(NETWORKS).join(", ")}`
+  );
+}
+
+export const NETWORK = selected;
+export const CHAIN = selected.chain;
+export const CHAIN_ID = selected.chain.id;
+export const DEPLOYMENT = selected.deployment;
+
+/** Address of the deployed course NFT, or `null` if this network has no deployment yet. */
+export const CONTRACT_ADDRESS = DEPLOYMENT.contractAddress as `0x${string}` | null;
+
+export const COURSE = {
+  code: "CPSC 3640 / CPSC 5400",
+  title: "Decentralized Payments, Contracts, and Finance for Humans and AI",
+  term: "Fall 2026"
+} as const;
+
+/** Where the claim page fetches Merkle proofs from. Respects the GitHub Pages base path. */
+export const PROOFS_URL = `${import.meta.env.BASE_URL}proofs.json`;
+
+export function explorerTx(hash: string): string | null {
+  return NETWORK.explorer ? `${NETWORK.explorer}/tx/${hash}` : null;
+}
+
+export function explorerAddress(address: string): string | null {
+  return NETWORK.explorer ? `${NETWORK.explorer}/address/${address}` : null;
+}

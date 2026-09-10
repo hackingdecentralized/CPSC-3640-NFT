@@ -1,0 +1,29 @@
+# Secrets - never commit
+.env
+.env.local
+.env.*.local
+
+# Foundry build output and broadcast/cache artifacts.
+# cache/ matters: forge writes the broadcasting key material there.
+cache/
+out/
+broadcast/
+
+# Node
+node_modules/
+web/node_modules/
+
+# Frontend build output. Published to gh-pages, never tracked on main.
+web/dist/
+
+# Generated from allowlist/addresses.json by `npm run merkle`.
+# allowlist/generated/example-tree.json IS committed - the Foundry tests read it.
+allowlist/generated/root.json
+allowlist/generated/proofs.json
+web/public/proofs.json
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/

@@ -1,0 +1,112 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='1024' height='1024' viewBox='0 0 1024 1024' role='img' aria-label='CPSC 3640/5400 Course NFT, Fall 2026'>
+<defs>
+<linearGradient id='bg' x1='0' y1='0' x2='1' y2='1'>
+<stop offset='0' stop-color='#17161c'/><stop offset='0.55' stop-color='#211f28'/><stop offset='1' stop-color='#15141a'/>
+</linearGradient>
+<linearGradient id='edge' x1='0' y1='0' x2='1' y2='0'>
+<stop offset='0' stop-color='#e8a33d'/><stop offset='1' stop-color='#6fbf9b'/>
+</linearGradient>
+<radialGradient id='halo' cx='0.5' cy='0.5' r='0.5'>
+<stop offset='0' stop-color='#e8a33d' stop-opacity='0.22'/><stop offset='1' stop-color='#e8a33d' stop-opacity='0'/>
+</radialGradient>
+<pattern id='grid' width='64' height='64' patternUnits='userSpaceOnUse'>
+<circle cx='1' cy='1' r='1.4' fill='#e8a33d' opacity='0.20'/>
+</pattern>
+</defs>
+
+<rect width='1024' height='1024' fill='url(#bg)'/>
+<rect width='1024' height='1024' fill='url(#grid)'/>
+<rect x='34' y='34' width='956' height='956' rx='26' fill='none' stroke='url(#edge)' stroke-width='2' opacity='0.55'/>
+<rect x='48' y='48' width='928' height='928' rx='18' fill='none' stroke='#e8a33d' stroke-width='1' opacity='0.18'/>
+
+<g stroke='#6fbf9b' stroke-width='1.2' opacity='0.28' fill='none'>
+<path d='M48 330 H150 L196 284 V220'/><path d='M976 330 H874 L828 284 V220'/>
+<path d='M48 690 H150 L196 736 V806'/><path d='M976 690 H874 L828 736 V806'/>
+</g>
+<g fill='#6fbf9b' opacity='0.5'>
+<circle cx='196' cy='284' r='4'/><circle cx='828' cy='284' r='4'/>
+<circle cx='196' cy='736' r='4'/><circle cx='828' cy='736' r='4'/>
+</g>
+
+<text x='512' y='146' text-anchor='middle' font-family='Helvetica Neue,Helvetica,Arial,sans-serif' font-size='58' font-weight='700' fill='#f6f0e4' letter-spacing='2'>CPSC 3640 / CPSC 5400</text>
+<line x1='336' y1='174' x2='688' y2='174' stroke='url(#edge)' stroke-width='2.5'/>
+<text x='512' y='222' text-anchor='middle' font-family='Helvetica Neue,Helvetica,Arial,sans-serif' font-size='31' fill='#bdb2a0'>Decentralized Payments,</text>
+<text x='512' y='262' text-anchor='middle' font-family='Helvetica Neue,Helvetica,Arial,sans-serif' font-size='31' fill='#bdb2a0'>Contracts, and Finance</text>
+
+<circle cx='512' cy='460' r='252' fill='url(#halo)'/>
+
+<g fill='#8d5a3c' stroke='#5e3a26' stroke-width='3'>
+<path d='M396 340 C352 330 328 358 334 396 C338 424 356 440 380 440 C376 406 382 368 396 340 Z'/>
+<path d='M628 340 C672 330 696 358 690 396 C686 424 668 440 644 440 C648 406 642 368 628 340 Z'/>
+</g>
+
+<path d='M512 310 C586 310 644 344 658 396 C668 434 666 464 658 488 C688 510 692 558 662 586 C634 610 576 622 512 622 C448 622 390 610 362 586 C332 558 336 510 366 488 C358 464 356 434 366 396 C380 344 438 310 512 310 Z' fill='#f4eee6' stroke='#c9bfae' stroke-width='2.5'/>
+
+<g fill='none' stroke='#d9cec0' stroke-width='4.5' stroke-linecap='round'>
+<path d='M416 396 C444 374 470 374 494 392'/>
+<path d='M608 396 C580 374 554 374 530 392'/>
+<path d='M512 364 V394'/>
+<path d='M386 446 C372 466 370 490 378 508'/>
+<path d='M638 446 C652 466 654 490 646 508'/>
+</g>
+
+<g fill='#16233a'>
+<ellipse cx='446' cy='432' rx='19' ry='17'/><ellipse cx='578' cy='432' rx='19' ry='17'/>
+</g>
+<g fill='#ffffff' opacity='0.9'>
+<circle cx='453' cy='426' r='6'/><circle cx='585' cy='426' r='6'/>
+</g>
+
+<path d='M512 470 C576 470 618 498 618 538 C618 578 570 602 512 602 C454 602 406 578 406 538 C406 498 448 470 512 470 Z' fill='#fbf7f1' stroke='#c9bfae' stroke-width='2'/>
+<g fill='none' stroke='#d9cec0' stroke-width='3.5' stroke-linecap='round'>
+<path d='M450 516 C424 542 416 572 422 596'/>
+<path d='M574 516 C600 542 608 572 602 596'/>
+</g>
+
+<path d='M512 476 C548 476 570 490 570 507 C570 527 544 538 512 538 C480 538 454 527 454 507 C454 490 476 476 512 476 Z' fill='#191920'/>
+<g fill='#4a4a58'>
+<ellipse cx='490' cy='505' rx='6.5' ry='9' transform='rotate(-18 490 505)'/>
+<ellipse cx='534' cy='505' rx='6.5' ry='9' transform='rotate(18 534 505)'/>
+</g>
+
+<g fill='none' stroke='#8d8275' stroke-width='4.5' stroke-linecap='round'>
+<path d='M512 538 V562'/>
+<path d='M512 562 C482 590 438 586 422 556'/>
+<path d='M512 562 C542 590 586 586 602 556'/>
+</g>
+<g fill='#ffffff'>
+<path d='M478 566 L486 546 L494 566 Z'/><path d='M530 566 L538 546 L546 566 Z'/>
+</g>
+<path d='M494 568 C494 592 530 592 530 568 Z' fill='#ff8fa3'/>
+
+<rect x='396' y='628' width='232' height='44' rx='15' fill='#242129' stroke='#6fbf9b' stroke-width='3'/>
+<g fill='none' stroke='#6fbf9b' stroke-width='2.5'>
+<rect x='430' y='639' width='22' height='22' rx='5'/>
+<rect x='476' y='639' width='22' height='22' rx='5'/>
+<rect x='522' y='639' width='22' height='22' rx='5'/>
+<rect x='568' y='639' width='22' height='22' rx='5'/>
+<path d='M452 650 H476'/><path d='M498 650 H522'/><path d='M544 650 H568'/>
+</g>
+
+<g font-family='Helvetica Neue,Helvetica,Arial,sans-serif' font-weight='600' fill='#f6f0e4'>
+<rect x='118' y='702' width='196' height='74' rx='37' fill='#272430' stroke='#e8a33d' stroke-width='2.5'/>
+<text x='216' y='748' text-anchor='middle' font-size='26' letter-spacing='4'>HUMAN</text>
+<rect x='372' y='702' width='280' height='74' rx='16' fill='#242129' stroke='#6fbf9b' stroke-width='2.5'/>
+<text x='512' y='734' text-anchor='middle' font-size='23' letter-spacing='3'>BLOCKCHAIN</text>
+<text x='512' y='762' text-anchor='middle' font-size='23' letter-spacing='3'>CONTRACT</text>
+<rect x='710' y='702' width='196' height='74' rx='37' fill='#2e2415' stroke='#e8a33d' stroke-width='2.5'/>
+<text x='808' y='750' text-anchor='middle' font-size='30' fill='#f7dfae' letter-spacing='10'>AI</text>
+</g>
+<g stroke='#6fbf9b' stroke-width='3' fill='#6fbf9b'>
+<path d='M332 739 H354' stroke-linecap='round'/>
+<path d='M341 730 L326 739 L341 748 Z' stroke='none'/><path d='M345 730 L360 739 L345 748 Z' stroke='none'/>
+</g>
+<g stroke='#e8a33d' stroke-width='3' fill='#e8a33d'>
+<path d='M670 739 H692' stroke-linecap='round'/>
+<path d='M679 730 L664 739 L679 748 Z' stroke='none'/><path d='M683 730 L698 739 L683 748 Z' stroke='none'/>
+</g>
+
+<line x1='336' y1='832' x2='688' y2='832' stroke='url(#edge)' stroke-width='2.5'/>
+<text x='512' y='894' text-anchor='middle' font-family='Helvetica Neue,Helvetica,Arial,sans-serif' font-size='46' font-weight='700' fill='#f6f0e4' letter-spacing='12'>FALL 2026</text>
+<text x='512' y='936' text-anchor='middle' font-family='Helvetica Neue,Helvetica,Arial,sans-serif' font-size='20' fill='#7d7466' letter-spacing='7'>COURSE NFT</text>
+</svg>

@@ -1,0 +1,66 @@
+# Tests and build only. This workflow deliberately does NOT deploy.
+#
+# Publishing to gh-pages happens from a developer machine via
+# `scripts/publish-pages.sh`. See "GitHub Pages and CI" in the README for why a
+# workflow that pushes gh-pages with GITHUB_TOKEN is not what you want here.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  contracts:
+    name: Foundry tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install allowlist tooling
+        run: npm install
+
+      - name: Regenerate the example Merkle fixture
+        run: npm run merkle -- --example
+
+      - name: Fail if the fixture is out of date
+        run: git diff --exit-code allowlist/generated/example-tree.json
+
+      - name: Check the on-chain SVG matches nft/course-nft.svg
+        run: |
+          npm run embed:svg
+          git diff --exit-code contracts/CPSC3640NFT.sol
+
+      - name: Run tests
+        run: forge test -vv
+
+      - name: Report contract size
+        run: forge build --sizes
+
+  web:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install allowlist tooling
+        run: npm install
+
+      - name: Generate proofs
+        run: npm run merkle -- --example
+
+      - name: Build the claim page
+        run: npm --prefix web ci && npm --prefix web run build

@@ -1,0 +1,21 @@
+{
+  "name": "cpsc3640-nft-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "dev:anvil": "VITE_NETWORK=anvil vite",
+    "build:anvil": "tsc --noEmit && VITE_NETWORK=anvil vite build"
+  },
+  "dependencies": {
+    "viem": "^2.21.55"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5"
+  }
+}
