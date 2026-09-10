@@ -340,26 +340,43 @@ contract CPSC3640NFTTest is Test {
         nft.claim(proofs[0]);
 
         string memory image = vm.parseJsonString(_decodedMetadata(1), ".image");
-        assertTrue(_startsWith(image, "data:image/webp;base64,"), "wrong image data URI prefix");
+        assertTrue(_startsWith(image, "data:image/svg+xml;base64,"), "wrong image data URI prefix");
 
-        string memory encoded = _slice(image, bytes("data:image/webp;base64,").length);
-        bytes memory decoded = Base64Decode.decode(encoded);
+        string memory svg =
+            string(Base64Decode.decode(_slice(image, bytes("data:image/svg+xml;base64,").length)));
 
-        // A WebP file is a RIFF container: "RIFF" <size> "WEBP".
-        assertEq(decoded[0], bytes1("R"), "missing RIFF magic");
-        assertEq(decoded[1], bytes1("I"));
-        assertEq(decoded[2], bytes1("F"));
-        assertEq(decoded[3], bytes1("F"));
-        assertEq(decoded[8], bytes1("W"), "missing WEBP magic");
-        assertEq(decoded[9], bytes1("E"));
-        assertEq(decoded[10], bytes1("B"));
-        assertEq(decoded[11], bytes1("P"));
+        assertTrue(_startsWith(svg, "<svg"), "decoded image should be SVG markup");
+        assertTrue(_contains(svg, "data:image/webp;base64,"), "SVG should embed the WebP artwork");
+        assertTrue(_contains(svg, ">No. 1</text>"), "SVG should carry this token's claim number");
+    }
 
-        assertEq(
-            keccak256(decoded),
-            keccak256(nft.rawImage()),
-            "decoded image must equal the contract's artwork"
+    /// @notice Each token's image is composited at read time, so every claim gets its
+    ///         own artwork without a single extra byte being stored.
+    function test_EachTokenGetsItsOwnClaimNumber() public {
+        vm.prank(allowlisted[0]);
+        nft.claim(proofs[0]);
+        vm.prank(allowlisted[1]);
+        nft.claim(proofs[1]);
+
+        assertTrue(_contains(_decodedImage(1), ">No. 1</text>"));
+        assertTrue(_contains(_decodedImage(2), ">No. 2</text>"));
+
+        assertTrue(
+            keccak256(bytes(nft.imageURI(1))) != keccak256(bytes(nft.imageURI(2))),
+            "two tokens must not share an image"
         );
+    }
+
+    function test_ClaimNumberIsASortableAttribute() public {
+        vm.prank(allowlisted[0]);
+        nft.claim(proofs[0]);
+        vm.prank(allowlisted[1]);
+        nft.claim(proofs[1]);
+
+        string memory json = _decodedMetadata(2);
+        assertEq(vm.parseJsonString(json, ".attributes[4].trait_type"), "Claim Number");
+        assertEq(vm.parseJsonString(json, ".attributes[4].display_type"), "number");
+        assertEq(vm.parseJsonUint(json, ".attributes[4].value"), 2);
     }
 
     /// @notice The image compiled into the contract must match the file on disk.
@@ -417,6 +434,28 @@ contract CPSC3640NFTTest is Test {
         string memory uri = nft.tokenURI(tokenId);
         string memory encoded = _slice(uri, bytes("data:application/json;base64,").length);
         return string(Base64Decode.decode(encoded));
+    }
+
+    function _decodedImage(uint256 tokenId) internal view returns (string memory) {
+        string memory image = vm.parseJsonString(_decodedMetadata(tokenId), ".image");
+        return string(Base64Decode.decode(_slice(image, bytes("data:image/svg+xml;base64,").length)));
+    }
+
+    function _contains(string memory haystack, string memory needle) internal pure returns (bool) {
+        bytes memory h = bytes(haystack);
+        bytes memory n = bytes(needle);
+        if (n.length == 0 || h.length < n.length) return false;
+        for (uint256 i = 0; i <= h.length - n.length; i++) {
+            bool match_ = true;
+            for (uint256 j = 0; j < n.length; j++) {
+                if (h[i + j] != n[j]) {
+                    match_ = false;
+                    break;
+                }
+            }
+            if (match_) return true;
+        }
+        return false;
     }
 
     function _startsWith(string memory subject, string memory prefix) internal pure returns (bool) {

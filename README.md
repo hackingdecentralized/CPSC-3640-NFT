@@ -9,7 +9,9 @@ for real: visit a page, connect a wallet, notice you are on the wrong network, f
 prove eligibility, sign a transaction, wait for a block, and end up owning something.
 
 The artwork and metadata live entirely in the contract: a 512x512 WebP of about 14 KB,
-sitting in the contract's own bytecode. No IPFS, no backend, no database. If this
+sitting in the contract's own bytecode. One stored image, but every token's picture is
+different: the claim number is composited onto it at read time, so the third student to
+claim gets a token stamped "No. 3". No IPFS, no backend, no database. If this
 repository and its website vanish tomorrow, every minted token still returns valid
 metadata and renders correctly in any wallet. See `nft/README.md` for why the artwork
 is 512x512 and not larger.
@@ -296,8 +298,9 @@ as compromised, move the contract owner to a fresh key, and rewrite history.
 | `claim(bytes32[] proof)` | anyone on the allowlist | mints one token to the caller |
 | `canClaim(address)` | view | could this address claim right now |
 | `isEligible(address, bytes32[])` | view | does this proof verify |
-| `tokenURI(uint256)` | view | Base64 JSON with a Base64 WebP inside |
-| `rawImage()` | view | the raw artwork bytes |
+| `tokenURI(uint256)` | view | Base64 JSON with a Base64 SVG inside |
+| `imageURI(uint256)` | view | that token's artwork, claim number composited in |
+| `rawImage()` | view | the raw stored artwork bytes |
 | `setMerkleRoot(bytes32)` | owner | rotate the allowlist |
 | `setClaimOpen(bool)` | owner | open or pause claiming |
 
@@ -317,8 +320,10 @@ tokenURI(1)
        {
          "name": "CPSC 3640/5400 - Fall 2026 #1",
          "description": "Decentralized Payments, Contracts, and Finance for Humans and AI...",
-         "attributes": [ Course, Semester, Type, Network ],
-         "image": "data:image/webp;base64,..."
+         "attributes": [ Course, Semester, Type, Network, Claim Number ],
+         "image": "data:image/svg+xml;base64,..."     <- SVG wrapping the stored
+                                                         WebP plus this token's
+                                                         claim number
        }
 ```
 

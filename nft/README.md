@@ -44,6 +44,22 @@ To trade resolution against quality, edit `SIZE` and `QUALITY` in
 `scripts/make-onchain-image.py`. For reference, at quality 65: 384px is about
 9.7 KB, 512px about 14.3 KB, and 576px runs over budget.
 
+## Per-token claim numbers
+
+The stored artwork is one fixed image, but every token's image is different.
+`imageURI(tokenId)` wraps the stored WebP in an SVG at read time and draws that
+token's claim number on it, so token 3 shows "No. 3". Token ids are assigned in
+`claim` order, so the number on the picture is literally where that student came
+in the queue.
+
+Nothing extra is stored per token. One image in bytecode, N distinct images out.
+Adding a student costs nothing, and the badge needs no upload, no pre-rendering
+and no roster known in advance. The number is also exposed as a sortable
+`Claim Number` attribute in the metadata.
+
+Costs about 5.1 million gas to read, which is free: `tokenURI` is a view function
+and this is well inside what public RPCs allow for `eth_call`.
+
 ## What is in the picture
 
 A bulldog in a Yale bandana over the course's organising idea:

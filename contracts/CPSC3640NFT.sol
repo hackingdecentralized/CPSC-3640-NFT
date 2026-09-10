@@ -162,18 +162,37 @@ contract CPSC3640NFT is ERC721, Ownable {
             '{"trait_type":"Course","value":"CPSC 3640/5400"},',
             '{"trait_type":"Semester","value":"Fall 2026"},',
             '{"trait_type":"Type","value":"Course NFT"},',
-            '{"trait_type":"Network","value":"Ethereum"}',
+            '{"trait_type":"Network","value":"Ethereum"},',
+            '{"trait_type":"Claim Number","display_type":"number","value":',
+            tokenId.toString(),
+            "}",
             '],"image":"',
-            imageURI(),
+            imageURI(tokenId),
             '"}'
         );
 
         return string.concat("data:application/json;base64,", Base64.encode(bytes(json)));
     }
 
-    /// @notice The artwork as a self-contained `data:image/webp;base64,...` URI.
-    function imageURI() public pure returns (string memory) {
-        return string.concat("data:image/webp;base64,", Base64.encode(rawImage()));
+    /// @notice The artwork for `tokenId`, with its claim number stamped on it.
+    /// @dev The stored artwork is one fixed image. The per-token badge is composited
+    ///      here, at read time, by wrapping that image in an SVG and drawing the number
+    ///      over it. Every token therefore has a distinct image without storing a
+    ///      distinct image, and without anything being uploaded anywhere.
+    function imageURI(uint256 tokenId) public pure returns (string memory) {
+        string memory svg = string.concat(
+            "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1254 1254' width='1254' height='1254'>",
+            "<image width='1254' height='1254' href='data:image/webp;base64,",
+            Base64.encode(CourseArtwork.image()),
+            "'/>",
+            "<g><rect x='985' y='1068' width='184' height='72' rx='36' fill='#17161c' ",
+            "fill-opacity='0.88' stroke='#e8a33d' stroke-width='3'/>",
+            "<text x='1077' y='1115' text-anchor='middle' font-family='Helvetica,Arial,sans-serif' ",
+            "font-size='34' font-weight='700' fill='#e8a33d' letter-spacing='2'>No. ",
+            tokenId.toString(),
+            "</text></g></svg>"
+        );
+        return string.concat("data:image/svg+xml;base64,", Base64.encode(bytes(svg)));
     }
 
     /// @notice The raw image bytes of the artwork.
