@@ -50,10 +50,11 @@ if (!receipt) {
   process.exit(1);
 }
 
-const rootPath = join(ROOT, "allowlist", "generated", "root.json");
-const merkleRoot = existsSync(rootPath)
-  ? JSON.parse(readFileSync(rootPath, "utf8")).merkleRoot
-  : null;
+// Everything below is read back out of the creation transaction, never out of local
+// build artifacts. allowlist/generated/root.json is whatever the generator last
+// wrote, which is not necessarily what was deployed: deploying with the allowlist
+// off passes a zero root while that file still holds a real one.
+const [owner, merkleRoot, claimOpen, allowlistEnabled] = tx.arguments ?? [];
 
 const record = {
   network,
@@ -61,8 +62,11 @@ const record = {
   contractAddress: tx.contractAddress,
   deploymentBlock: Number(receipt.blockNumber),
   transactionHash: tx.hash,
-  merkleRoot,
   deployer: tx.transaction.from,
+  owner: owner ?? null,
+  merkleRoot: merkleRoot ?? null,
+  claimOpen: claimOpen === undefined ? null : claimOpen === "true",
+  allowlistEnabled: allowlistEnabled === undefined ? null : allowlistEnabled === "true",
   // Exactly what was passed to the constructor. Explorer verification needs these
   // to match byte for byte, so they are recorded rather than reconstructed later.
   constructorArgs: tx.arguments ?? null,
