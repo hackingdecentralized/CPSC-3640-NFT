@@ -85,20 +85,16 @@ say "Running contract tests"
 forge test >/dev/null || die "tests failed - not deploying"
 
 # 3. Allowlist ----------------------------------------------------------------
-# REQUIRE_ALLOWLIST=false deploys a contract anyone can claim from. In that case
-# there is no roster to build and no root to check.
-REQUIRE_ALLOWLIST="${REQUIRE_ALLOWLIST:-true}"
+# Open by default: anyone may claim one token, and there is no roster to build.
+# Set REQUIRE_ALLOWLIST=true to restrict claiming to allowlist/addresses.json.
+REQUIRE_ALLOWLIST="${REQUIRE_ALLOWLIST:-false}"
 export REQUIRE_ALLOWLIST
 
 if [ "$REQUIRE_ALLOWLIST" = "false" ]; then
-  say "Allowlist: OFF"
+  say "Allowlist: OFF (the default)"
   echo "    Any address may claim one token. One per wallet still holds, but one"
   echo "    person can use several wallets, so this is open to whoever finds the page."
-  if [ "$NETWORK" = "sepolia" ]; then
-    printf '    Deploy an open claim to Sepolia? [y/N] '
-    read -r reply
-    [ "$reply" = "y" ] || die "aborted"
-  fi
+  echo "    Restrict it with: REQUIRE_ALLOWLIST=true scripts/deploy.sh $NETWORK"
 else
   [ -f allowlist/generated/root.json ] || die "no Merkle root. Run: npm run merkle"
   MERKLE_ROOT="$(python3 -c 'import json;print(json.load(open("allowlist/generated/root.json"))["merkleRoot"])')"
@@ -112,7 +108,10 @@ else
   if [ "$NETWORK" = "sepolia" ] && [ "$SOURCE" = "allowlist/addresses.example.json" ]; then
     warn "This root is the Anvil example roster, not a real one."
     warn "Five test accounts could claim, and nobody else."
-    printf '    Continue anyway? [y/N] '
+    echo "    You probably want one of:"
+    echo "      REQUIRE_ALLOWLIST=false scripts/deploy.sh sepolia   # let anyone claim"
+    echo "      put real addresses in allowlist/addresses.json, then: npm run merkle"
+    printf '    Continue with the example roster anyway? [y/N] '
     read -r reply
     [ "$reply" = "y" ] || die "aborted"
   fi

@@ -40,7 +40,7 @@ https://cloud.google.com/application/web3/faucet/ethereum/sepolia
 Paste your address in and it sends you a small amount. The claim page shows your address
 with a copy button, and tells you when you have none.
 
-Then connect, and if your address is on the course allowlist you can claim. Your token's
+Then connect and claim. Your token's
 number is your place in the queue: the third person to claim gets a token stamped
 "No. 3", and that number is part of the artwork itself.
 
@@ -127,8 +127,8 @@ wallet calls claim(proof)
 ```
 
 Whether a proof is needed at all is a deploy-time choice, held in `allowlistEnabled` and
-changeable later by the owner. With it off, any address may claim one token and the page
-never fetches `proofs.json`. One per wallet still holds, but one person can use several
+changeable later by the owner. It is **off by default**: any address may claim one token,
+and the page never fetches `proofs.json`. One per wallet still holds, but one person can use several
 wallets, so an open claim is a collectible for whoever finds the page rather than a
 record of who was enrolled.
 
@@ -221,24 +221,25 @@ cp .env.example .env
 optional but worth setting: with it, the source is verified on Etherscan as part of the
 deploy, with no second step.
 
-**2. Choose who may claim.**
+**2. Choose who may claim.** By default anyone may claim one token, so there is nothing
+to do here and you can go straight to step 3.
 
-To let anyone claim, skip straight to step 3 with:
-
-```bash
-REQUIRE_ALLOWLIST=false scripts/deploy.sh sepolia
-```
-
-For an allowlist, put the wallet addresses in `allowlist/addresses.json` and build the
-tree. Addresses only, never names, emails or NetIDs:
+To restrict it to a roster instead, put the wallet addresses in
+`allowlist/addresses.json`, addresses only and never names, emails or NetIDs, then build
+the tree and deploy with the flag set:
 
 ```bash
 npm run merkle
 ```
 
-If that file is missing the generator falls back to `allowlist/addresses.example.json`,
-which is five Anvil test accounts. Deploying that root would let those five test wallets
-claim and nobody else, so `scripts/deploy.sh` stops and asks before it lets you.
+```bash
+REQUIRE_ALLOWLIST=true scripts/deploy.sh sepolia
+```
+
+If `addresses.json` is missing the generator falls back to
+`allowlist/addresses.example.json`, five Anvil test accounts. Deploying that root would
+let those five test wallets claim and nobody else, so `scripts/deploy.sh` stops and asks
+before it lets you.
 
 **3. Deploy.**
 

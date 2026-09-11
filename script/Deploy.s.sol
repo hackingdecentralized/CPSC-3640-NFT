@@ -13,7 +13,8 @@ import {CPSC3640NFT} from "../contracts/CPSC3640NFT.sol";
 ///        MERKLE_ROOT           optional, overrides allowlist/generated/root.json
 ///        CONTRACT_OWNER        optional, defaults to the deployer
 ///        CLAIM_OPEN            optional, defaults to true
-///        REQUIRE_ALLOWLIST     optional, defaults to true. Set false to let anyone claim.
+///        REQUIRE_ALLOWLIST     optional, defaults to false: anyone may claim one
+///                              token. Set true to require a Merkle proof.
 ///
 ///      Local Anvil:
 ///        forge script script/Deploy.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
@@ -36,7 +37,7 @@ contract Deploy is Script {
         address deployer = vm.addr(deployerKey);
         address owner = vm.envOr("CONTRACT_OWNER", deployer);
         bool claimOpen = vm.envOr("CLAIM_OPEN", true);
-        bool requireAllowlist = vm.envOr("REQUIRE_ALLOWLIST", true);
+        bool requireAllowlist = vm.envOr("REQUIRE_ALLOWLIST", false);
         bytes32 merkleRoot = requireAllowlist ? _merkleRoot() : bytes32(0);
 
         require(
