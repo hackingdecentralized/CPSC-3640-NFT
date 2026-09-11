@@ -197,8 +197,10 @@ function panel(): string {
   switch (state.stage) {
     case "no-wallet":
       return `<h2>Set up a wallet</h2>
-        <p class="lede">Three one-time steps. You only ever do this once.</p>
-        ${statusBlock("warn", "No Ethereum wallet detected in this browser")}
+        <p class="lede">
+          No Ethereum wallet detected in this browser. Three one-time steps, and you
+          only ever do them once.
+        </p>
         <ol class="setup">
           <li>
             <strong>Install MetaMask.</strong>
@@ -408,7 +410,10 @@ function render(): void {
       <section class="card stack">${panel()}</section>
     </div>
     ${chainbar()}
-    <p class="disclaimer">&copy; Yale ${escapeHtml(COURSE.code)}</p>
+    <p class="disclaimer">
+      &copy; Yale ${escapeHtml(COURSE.code)},
+      <a href="${COURSE.site}" target="_blank" rel="noopener noreferrer">${escapeHtml(COURSE.site)}</a>
+    </p>
   `;
 
   bind("reload", () => window.location.reload());

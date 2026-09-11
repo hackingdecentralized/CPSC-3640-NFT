@@ -99,10 +99,13 @@ code, .mono {
 
 /* ---- status blocks ---- */
 .status { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 10px; font-size: 14px; }
-.status.info { background: #1d222b; border: 1px solid #2c3846; }
-.status.good { background: #17251f; border: 1px solid #2c4a3c; }
-.status.warn { background: #2a2418; border: 1px solid #4d4023; }
-.status.bad  { background: #2a1c19; border: 1px solid #4d2c25; }
+/* A tinted panel with a coloured edge, rather than a solid block of muddy colour.
+   Carries the same tone at a glance without shouting. */
+.status { border: 1px solid; border-left-width: 3px; }
+.status.info { background: rgba(169, 158, 140, 0.07); border-color: rgba(169, 158, 140, 0.20); border-left-color: var(--muted); }
+.status.good { background: rgba(111, 191, 155, 0.08); border-color: rgba(111, 191, 155, 0.22); border-left-color: var(--sage); }
+.status.warn { background: rgba(232, 163, 61, 0.08); border-color: rgba(232, 163, 61, 0.22); border-left-color: var(--amber); }
+.status.bad  { background: rgba(224, 120, 95, 0.08); border-color: rgba(224, 120, 95, 0.24); border-left-color: var(--danger); }
 .status strong { display: block; margin-bottom: 2px; }
 .status .detail { display: block; margin-top: 6px; color: var(--muted); font-size: 12.5px; word-break: break-word; }
 
@@ -151,3 +154,5 @@ a { color: var(--amber); }
 }
 .chainbar span { color: var(--text); }
 .disclaimer { margin-top: 18px; text-align: center; color: var(--muted); font-size: 12.5px; }
+.disclaimer a { color: var(--muted); text-decoration: none; }
+.disclaimer a:hover { color: var(--amber); text-decoration: underline; }
