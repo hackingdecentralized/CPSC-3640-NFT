@@ -31,6 +31,7 @@ import {
   isEligibleOnChain,
   readContractState,
   readToken,
+  readTotalMinted,
   submitClaim,
   waitForClaim,
   type OwnedToken
@@ -77,6 +78,7 @@ interface State {
 const root = document.querySelector<HTMLElement>("#app")!;
 let state: State = {stage: "disconnected"};
 let pendingTimer: number | undefined;
+let countTimer: number | undefined;
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -109,10 +111,15 @@ function setState(patch: Partial<State>): void {
   render();
 }
 
-/** Move to a stage and drop anything left over from the previous one. */
+/**
+ * Move to a stage and drop anything left over from the previous one.
+ *
+ * The account and the claim count survive: both describe the world rather than
+ * the current step, and the count is kept fresh by its own poller.
+ */
 function goto(stage: Stage, patch: Partial<State> = {}): void {
   window.clearTimeout(pendingTimer);
-  state = {stage, account: state.account, ...patch};
+  state = {stage, account: state.account, totalMinted: state.totalMinted, ...patch};
   render();
 }
 
@@ -320,8 +327,14 @@ function chainbar(): string {
     ? `<span class="mono">${shorten(CONTRACT_ADDRESS, 10, 8)}</span>`
     : "<span>not deployed</span>";
   const link = CONTRACT_ADDRESS ? explorerAddress(CONTRACT_ADDRESS) : null;
+  const claimed =
+    state.totalMinted === undefined
+      ? ""
+      : `<div>Claimed so far <span>${state.totalMinted}</span></div>`;
+
   return `<div class="chainbar">
     <div>Network <span>${escapeHtml(NETWORK.label)}</span> (chain ${CHAIN_ID})</div>
+    ${claimed}
     <div>Contract ${link ? `<a class="mono" href="${link}" target="_blank" rel="noopener noreferrer">${shorten(CONTRACT_ADDRESS!, 10, 8)}</a>` : address}</div>
   </div>`;
 }
@@ -514,6 +527,50 @@ async function claim(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Live claim count
+// ---------------------------------------------------------------------------
+
+/**
+ * Keep the claim count fresh while the page is open.
+ *
+ * Only `totalMinted` is re-read, and the page only re-renders when the number
+ * actually moves, so a quiet page costs one `eth_call` per tick and no DOM work.
+ * The whole stage is never re-derived here: that would fight with whatever the
+ * student is in the middle of doing.
+ */
+function startCountPolling(): void {
+  stopCountPolling();
+  if (!CONTRACT_ADDRESS) return;
+
+  countTimer = window.setInterval(async () => {
+    // Nothing to show, and nothing safe to read, before a wallet is on the right chain.
+    if (document.hidden || !state.account || state.stage === "wrong-network") return;
+
+    try {
+      const latest = await readTotalMinted();
+      if (latest !== state.totalMinted) setState({totalMinted: latest});
+    } catch (error) {
+      // A transient RPC failure should not disturb the page. It will retry next tick.
+      console.debug("claim count poll failed", error);
+    }
+  }, NETWORK.pollIntervalMs);
+}
+
+async function refreshCount(): Promise<void> {
+  try {
+    const latest = await readTotalMinted();
+    if (latest !== state.totalMinted) setState({totalMinted: latest});
+  } catch (error) {
+    console.debug("claim count refresh failed", error);
+  }
+}
+
+function stopCountPolling(): void {
+  window.clearInterval(countTimer);
+  countTimer = undefined;
+}
+
+// ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 
@@ -531,9 +588,16 @@ async function boot(): Promise<void> {
   // straight back on the right screen without a popup.
   await refresh();
 
+  startCountPolling();
+
   onWalletChange(() => {
     state = {stage: state.stage};
     void refresh();
+  });
+
+  // Catch up immediately when the student comes back to the tab.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && state.account) void refreshCount();
   });
 }
 

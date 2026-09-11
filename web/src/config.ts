@@ -32,6 +32,14 @@ export interface NetworkConfig {
   /** Explorer origin, or `null` for local chains that have none. */
   explorer: string | null;
   deployment: Deployment;
+  /**
+   * How often the page re-reads the claim count.
+   *
+   * Matched to how fast the chain can actually change. Sepolia produces a block
+   * roughly every 12 seconds, so polling faster than that spends the student's RPC
+   * quota to learn nothing. Anvil mines on demand, so it can be checked often.
+   */
+  pollIntervalMs: number;
 }
 
 const NETWORKS: Record<string, NetworkConfig> = {
@@ -39,13 +47,15 @@ const NETWORKS: Record<string, NetworkConfig> = {
     chain: sepolia,
     label: "Ethereum Sepolia",
     explorer: "https://sepolia.etherscan.io",
-    deployment: sepoliaDeployment as Deployment
+    deployment: sepoliaDeployment as Deployment,
+    pollIntervalMs: 12_000
   },
   anvil: {
     chain: foundry,
     label: "Local Anvil",
     explorer: null,
-    deployment: anvilDeployment as Deployment
+    deployment: anvilDeployment as Deployment,
+    pollIntervalMs: 2_000
   }
 };
 

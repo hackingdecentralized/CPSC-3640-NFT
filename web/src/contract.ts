@@ -179,6 +179,15 @@ export async function readToken(tokenId: bigint): Promise<OwnedToken> {
   };
 }
 
+/** Just the claim count. Cheap enough to re-read on a timer. */
+export async function readTotalMinted(): Promise<bigint> {
+  return publicClient().readContract({
+    address: contractAddress(),
+    abi: CPSC3640NFT_ABI,
+    functionName: "totalMinted"
+  });
+}
+
 export async function ownerOf(tokenId: bigint): Promise<Address> {
   return publicClient().readContract({
     address: contractAddress(),
