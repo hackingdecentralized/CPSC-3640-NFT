@@ -408,10 +408,7 @@ function render(): void {
       <section class="card stack">${panel()}</section>
     </div>
     ${chainbar()}
-    <p class="disclaimer">
-      &copy; ${COURSE.year}, ${escapeHtml(COURSE.code)},
-      <a href="${COURSE.site}" target="_blank" rel="noopener noreferrer">${escapeHtml(COURSE.site)}</a>
-    </p>
+    <p class="disclaimer">&copy; Yale ${escapeHtml(COURSE.code)}</p>
   `;
 
   bind("reload", () => window.location.reload());
