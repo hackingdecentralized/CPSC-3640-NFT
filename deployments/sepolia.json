@@ -4,13 +4,16 @@
   "contractAddress": "0x91e67ce5959ae94d898ed3c3add09d93dfb7f6bf",
   "deploymentBlock": 11678558,
   "transactionHash": "0xb04fbe84b7cb53a4f547c82106e6cfe96f9b79225dcdb971f44ab72b4f10135b",
-  "merkleRoot": "0xc059f4734687b6fc0bd461fabbf845b76a23795502bf513d272093270a6d4c6c",
   "deployer": "0x6376b9b4ea797e48e0dc9349b2413d47d19d298e",
+  "owner": "0x6376B9B4ea797E48e0dc9349B2413d47D19d298E",
+  "merkleRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "claimOpen": true,
+  "allowlistEnabled": false,
   "constructorArgs": [
     "0x6376B9B4ea797E48e0dc9349B2413d47D19d298E",
     "0x0000000000000000000000000000000000000000000000000000000000000000",
     "true",
     "false"
   ],
-  "deployedAt": "2026-09-11T00:56:57.335Z"
+  "deployedAt": "2026-09-11T01:00:39.362Z"
 }
