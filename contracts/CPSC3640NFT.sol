@@ -33,6 +33,8 @@ contract CPSC3640NFT is ERC721, Ownable {
     error InvalidProof();
     /// @notice No Merkle root has been configured, so nobody can be eligible yet.
     error MerkleRootNotSet();
+    /// @notice Deployment was attempted on a chain this contract is not meant for.
+    error UnsupportedChain(uint256 chainId);
 
     // ---------------------------------------------------------------------
     // Events
@@ -45,6 +47,8 @@ contract CPSC3640NFT is ERC721, Ownable {
     event MerkleRootUpdated(bytes32 indexed previousRoot, bytes32 indexed newRoot);
     /// @notice Emitted when the owner opens or closes claiming.
     event ClaimOpenUpdated(bool isOpen);
+    /// @notice Emitted when the owner turns the allowlist requirement on or off.
+    event AllowlistEnabledUpdated(bool isEnabled);
 
     // ---------------------------------------------------------------------
     // Storage
@@ -60,11 +64,26 @@ contract CPSC3640NFT is ERC721, Ownable {
     /// @notice Whether claiming is currently open.
     bool public claimOpen;
 
+    /// @notice Whether a Merkle proof is required to claim.
+    /// @dev When false, any address may claim one token. The one-per-wallet rule still
+    ///      holds, but nothing stops one person using several wallets, so an open claim
+    ///      is a collectible handed to whoever finds the page, not a roster of students.
+    bool public allowlistEnabled;
+
     /// @notice Records which addresses have already claimed. Enforces one per wallet.
     mapping(address => bool) public hasClaimed;
 
     /// @notice Number of tokens minted so far. Token ids are 1..totalMinted.
     uint256 public totalMinted;
+
+    // ---------------------------------------------------------------------
+    // Where this contract is allowed to exist
+    // ---------------------------------------------------------------------
+
+    /// @notice Ethereum Sepolia, the network this course runs on.
+    uint256 public constant SEPOLIA = 11155111;
+    /// @notice Anvil's default chain id, so the local demo and the tests still work.
+    uint256 public constant LOCAL = 31337;
 
     // ---------------------------------------------------------------------
     // Construction
@@ -73,14 +92,31 @@ contract CPSC3640NFT is ERC721, Ownable {
     /// @param initialOwner Address that may update the root and open/close claiming.
     /// @param initialMerkleRoot Allowlist root; may be `bytes32(0)` and set later.
     /// @param initialClaimOpen Whether claiming starts open.
-    constructor(address initialOwner, bytes32 initialMerkleRoot, bool initialClaimOpen)
+    /// @param requireAllowlist Whether a Merkle proof is required. Pass false to let
+    ///        anyone claim one token.
+    constructor(
+        address initialOwner,
+        bytes32 initialMerkleRoot,
+        bool initialClaimOpen,
+        bool requireAllowlist
+    )
         ERC721("CPSC 3640/5400 Course NFT", "CPSC3640")
         Ownable(initialOwner)
     {
+        // The course runs on Sepolia, and deployment is the only moment that can be
+        // enforced for good. Scripts and config files can be edited or bypassed with a
+        // direct `forge create`; this check cannot. Anything that is not Sepolia or a
+        // local node - mainnet, an L2, another testnet - is refused here.
+        if (block.chainid != SEPOLIA && block.chainid != LOCAL) {
+            revert UnsupportedChain(block.chainid);
+        }
+
         merkleRoot = initialMerkleRoot;
         claimOpen = initialClaimOpen;
+        allowlistEnabled = requireAllowlist;
         emit MerkleRootUpdated(bytes32(0), initialMerkleRoot);
         emit ClaimOpenUpdated(initialClaimOpen);
+        emit AllowlistEnabledUpdated(requireAllowlist);
     }
 
     // ---------------------------------------------------------------------
@@ -95,9 +131,11 @@ contract CPSC3640NFT is ERC721, Ownable {
         if (!claimOpen) revert ClaimClosed();
         if (hasClaimed[msg.sender]) revert AlreadyClaimed();
 
-        bytes32 root = merkleRoot;
-        if (root == bytes32(0)) revert MerkleRootNotSet();
-        if (!MerkleProof.verifyCalldata(proof, root, _leaf(msg.sender))) revert InvalidProof();
+        if (allowlistEnabled) {
+            bytes32 root = merkleRoot;
+            if (root == bytes32(0)) revert MerkleRootNotSet();
+            if (!MerkleProof.verifyCalldata(proof, root, _leaf(msg.sender))) revert InvalidProof();
+        }
 
         // Effects before interactions: `_safeMint` calls back into the receiver.
         hasClaimed[msg.sender] = true;
@@ -110,11 +148,13 @@ contract CPSC3640NFT is ERC721, Ownable {
     /// @notice Whether `account` could claim right now, ignoring the proof.
     /// @dev A convenience read for the website. Never a substitute for `claim`'s checks.
     function canClaim(address account) external view returns (bool) {
-        return claimOpen && !hasClaimed[account] && merkleRoot != bytes32(0);
+        if (!claimOpen || hasClaimed[account]) return false;
+        return !allowlistEnabled || merkleRoot != bytes32(0);
     }
 
     /// @notice Check a proof without sending a transaction.
     function isEligible(address account, bytes32[] calldata proof) external view returns (bool) {
+        if (!allowlistEnabled) return true;
         bytes32 root = merkleRoot;
         if (root == bytes32(0)) return false;
         return MerkleProof.verifyCalldata(proof, root, _leaf(account));
@@ -142,6 +182,14 @@ contract CPSC3640NFT is ERC721, Ownable {
     function setClaimOpen(bool isOpen) external onlyOwner {
         claimOpen = isOpen;
         emit ClaimOpenUpdated(isOpen);
+    }
+
+    /// @notice Require a Merkle proof, or let anyone claim.
+    /// @dev Turning this off opens the collection to any address that finds the page.
+    ///      Turning it back on does not revoke tokens already claimed.
+    function setAllowlistEnabled(bool isEnabled) external onlyOwner {
+        allowlistEnabled = isEnabled;
+        emit AllowlistEnabledUpdated(isEnabled);
     }
 
     // ---------------------------------------------------------------------

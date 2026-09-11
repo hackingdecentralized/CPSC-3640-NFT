@@ -116,6 +116,7 @@ wallet calls claim(proof)
         |
         v  is claiming open?          -> ClaimClosed
         v  has this address claimed?  -> AlreadyClaimed
+        v  allowlist on?              -> if off, skip the next check
         v  does the proof verify?     -> InvalidProof
         v
    mark address as claimed
@@ -125,8 +126,14 @@ wallet calls claim(proof)
    emit Claimed(account, tokenId)
 ```
 
-Eligibility is a Merkle proof. The contract stores one 32-byte root; the page holds the
-proofs. Leaves use OpenZeppelin's `StandardMerkleTree` encoding:
+Whether a proof is needed at all is a deploy-time choice, held in `allowlistEnabled` and
+changeable later by the owner. With it off, any address may claim one token and the page
+never fetches `proofs.json`. One per wallet still holds, but one person can use several
+wallets, so an open claim is a collectible for whoever finds the page rather than a
+record of who was enrolled.
+
+With it on, eligibility is a Merkle proof. The contract stores one 32-byte root; the page
+holds the proofs. Leaves use OpenZeppelin's `StandardMerkleTree` encoding:
 
 ```
 leaf   = keccak256(bytes.concat(keccak256(abi.encode(address))))
@@ -214,11 +221,24 @@ cp .env.example .env
 optional but worth setting: with it, the source is verified on Etherscan as part of the
 deploy, with no second step.
 
-**2. Build the allowlist** from `allowlist/addresses.json`:
+**2. Choose who may claim.**
+
+To let anyone claim, skip straight to step 3 with:
+
+```bash
+REQUIRE_ALLOWLIST=false scripts/deploy.sh sepolia
+```
+
+For an allowlist, put the wallet addresses in `allowlist/addresses.json` and build the
+tree. Addresses only, never names, emails or NetIDs:
 
 ```bash
 npm run merkle
 ```
+
+If that file is missing the generator falls back to `allowlist/addresses.example.json`,
+which is five Anvil test accounts. Deploying that root would let those five test wallets
+claim and nobody else, so `scripts/deploy.sh` stops and asks before it lets you.
 
 **3. Deploy.**
 
@@ -345,11 +365,17 @@ as compromised, move the contract owner to a fresh key, and rewrite history.
 | `rawImage()` | view | the raw stored artwork bytes |
 | `setMerkleRoot(bytes32)` | owner | rotate the allowlist |
 | `setClaimOpen(bool)` | owner | open or pause claiming |
+| `setAllowlistEnabled(bool)` | owner | require a proof, or let anyone claim |
 
 Events: `Claimed(address indexed account, uint256 indexed tokenId)`,
 `MerkleRootUpdated`, `ClaimOpenUpdated`.
 
-Errors: `ClaimClosed`, `AlreadyClaimed`, `InvalidProof`, `MerkleRootNotSet`.
+Errors: `ClaimClosed`, `AlreadyClaimed`, `InvalidProof`, `MerkleRootNotSet`,
+`UnsupportedChain`.
+
+The constructor refuses to deploy anywhere except Sepolia (11155111) or a local node
+(31337). Scripts and config files can be edited or bypassed with a direct `forge create`;
+that check cannot, and deployment is the only moment it can be enforced for good.
 
 Tokens are ordinary transferable ERC-721s. A non-transferable badge would be a different
 contract with different semantics, not a flag on this one.

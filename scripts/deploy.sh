@@ -85,18 +85,37 @@ say "Running contract tests"
 forge test >/dev/null || die "tests failed - not deploying"
 
 # 3. Allowlist ----------------------------------------------------------------
-[ -f allowlist/generated/root.json ] || die "no Merkle root. Run: npm run merkle"
-MERKLE_ROOT="$(python3 -c 'import json;print(json.load(open("allowlist/generated/root.json"))["merkleRoot"])')"
-COUNT="$(python3 -c 'import json;print(json.load(open("allowlist/generated/root.json"))["addressCount"])')"
-SOURCE="$(python3 -c 'import json;print(json.load(open("allowlist/generated/root.json"))["source"])')"
-say "Allowlist: $COUNT addresses from $SOURCE"
-echo "    root: $MERKLE_ROOT"
+# REQUIRE_ALLOWLIST=false deploys a contract anyone can claim from. In that case
+# there is no roster to build and no root to check.
+REQUIRE_ALLOWLIST="${REQUIRE_ALLOWLIST:-true}"
+export REQUIRE_ALLOWLIST
 
-if [ "$NETWORK" = "sepolia" ] && [ "$SOURCE" = "allowlist/addresses.example.json" ]; then
-  warn "This root is the Anvil example roster, not a real one."
-  printf '    Continue anyway? [y/N] '
-  read -r reply
-  [ "$reply" = "y" ] || die "aborted"
+if [ "$REQUIRE_ALLOWLIST" = "false" ]; then
+  say "Allowlist: OFF"
+  echo "    Any address may claim one token. One per wallet still holds, but one"
+  echo "    person can use several wallets, so this is open to whoever finds the page."
+  if [ "$NETWORK" = "sepolia" ]; then
+    printf '    Deploy an open claim to Sepolia? [y/N] '
+    read -r reply
+    [ "$reply" = "y" ] || die "aborted"
+  fi
+else
+  [ -f allowlist/generated/root.json ] || die "no Merkle root. Run: npm run merkle"
+  MERKLE_ROOT="$(python3 -c 'import json;print(json.load(open("allowlist/generated/root.json"))["merkleRoot"])')"
+  COUNT="$(python3 -c 'import json;print(json.load(open("allowlist/generated/root.json"))["addressCount"])')"
+  SOURCE="$(python3 -c 'import json;print(json.load(open("allowlist/generated/root.json"))["source"])')"
+  say "Allowlist: $COUNT addresses from $SOURCE"
+  echo "    root: $MERKLE_ROOT"
+
+  # The generator falls back to the Anvil example roster when addresses.json is
+  # absent. Deploying that would allow five test accounts and no real student.
+  if [ "$NETWORK" = "sepolia" ] && [ "$SOURCE" = "allowlist/addresses.example.json" ]; then
+    warn "This root is the Anvil example roster, not a real one."
+    warn "Five test accounts could claim, and nobody else."
+    printf '    Continue anyway? [y/N] '
+    read -r reply
+    [ "$reply" = "y" ] || die "aborted"
+  fi
 fi
 
 # 4. Deploy, verifying as part of the same run --------------------------------

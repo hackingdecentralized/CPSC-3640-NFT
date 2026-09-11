@@ -72,6 +72,8 @@ interface State {
   token?: OwnedToken;
   /** Tokens minted so far. Token ids are claim order, so this is the queue length. */
   totalMinted?: bigint;
+  /** False when the contract lets anyone claim, so the panel can say so. */
+  allowlistEnabled?: boolean;
   /** True once a submitted transaction has been outstanding long enough to mention. */
   slow?: boolean;
   /** A recoverable problem, shown as a banner without discarding the current stage. */
@@ -307,7 +309,9 @@ function panel(): string {
         ${statusBlock(
           "good",
           `You will be the ${ordinal(next)} to claim`,
-          "One NFT per wallet. Your claim number is minted into the artwork itself."
+          state.allowlistEnabled === false
+            ? "Open to anyone, one NFT per wallet. Your claim number is minted into the artwork itself."
+            : "One NFT per wallet. Your claim number is minted into the artwork itself."
         )}
         <button class="primary" id="claim">Claim Course NFT</button>`;
     }
@@ -494,56 +498,66 @@ async function refresh(): Promise<void> {
       return;
     }
 
-    const [contractState, proof, balance] = await Promise.all([
+    const [contractState, balance] = await Promise.all([
       readContractState(account),
-      proofFor(account),
       balanceOf(account)
     ]);
+    const {allowlistEnabled, totalMinted} = contractState;
 
     // Already claimed in this or an earlier session: rebuild the success view from chain state.
     if (contractState.hasClaimed) {
-      await showOwnedToken(account, contractState.totalMinted);
+      await showOwnedToken(account, totalMinted);
       return;
     }
 
     if (!contractState.claimOpen) {
-      goto("claim-closed", {account});
+      goto("claim-closed", {account, allowlistEnabled});
       return;
     }
 
-    if (!proof) {
-      goto("not-eligible", {account});
-      return;
-    }
+    // With the allowlist off the contract accepts any address, so proofs.json is not
+    // fetched at all: it may not even have been published.
+    let proof: Hex[] = [];
 
-    // proofs.json says yes. Only the contract's answer decides whether we offer a button.
-    const eligible = await isEligibleOnChain(account, proof);
-    if (!eligible) {
-      const root = await publishedRoot().catch(() => null);
-      const stale = root && root.toLowerCase() !== contractState.merkleRoot.toLowerCase();
-      goto("not-eligible", {
-        account,
-        notice: stale
-          ? {
-              message: "This page is showing an out-of-date allowlist.",
-              detail: "The published Merkle root does not match the contract. Ask the course staff to rebuild the site."
-            }
-          : undefined
-      });
-      return;
+    if (allowlistEnabled) {
+      const found = await proofFor(account);
+      if (!found) {
+        goto("not-eligible", {account, allowlistEnabled});
+        return;
+      }
+
+      // proofs.json says yes. Only the contract's answer decides whether we offer a button.
+      if (!(await isEligibleOnChain(account, found))) {
+        const root = await publishedRoot().catch(() => null);
+        const stale = root && root.toLowerCase() !== contractState.merkleRoot.toLowerCase();
+        goto("not-eligible", {
+          account,
+          allowlistEnabled,
+          notice: stale
+            ? {
+                message: "This page is showing an out-of-date allowlist.",
+                detail: "The published Merkle root does not match the contract. Ask the course staff to rebuild the site."
+              }
+            : undefined
+        });
+        return;
+      }
+
+      proof = found;
     }
 
     // Only ask for gas money from someone who is actually about to spend it. A
     // student who already claimed, or who is not on the list, needs none.
     if (balance === 0n) {
-      goto("needs-gas", {account, totalMinted: contractState.totalMinted});
+      goto("needs-gas", {account, totalMinted, allowlistEnabled});
       return;
     }
 
     goto("eligible", {
       account,
       proof,
-      totalMinted: contractState.totalMinted,
+      totalMinted,
+      allowlistEnabled,
       notice:
         balance < COMFORTABLE_GAS_WEI
           ? {

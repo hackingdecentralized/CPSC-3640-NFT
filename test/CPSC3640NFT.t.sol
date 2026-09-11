@@ -78,7 +78,7 @@ contract CPSC3640NFTTest is Test {
             proofs.push(vm.parseJsonBytes32Array(json, string.concat(base, ".proof")));
         }
 
-        nft = new CPSC3640NFT(owner, merkleRoot, true);
+        nft = new CPSC3640NFT(owner, merkleRoot, true, true);
     }
 
     // -----------------------------------------------------------------------
@@ -173,7 +173,7 @@ contract CPSC3640NFTTest is Test {
     }
 
     function test_ClaimFailsWhenRootUnset() public {
-        CPSC3640NFT fresh = new CPSC3640NFT(owner, bytes32(0), true);
+        CPSC3640NFT fresh = new CPSC3640NFT(owner, bytes32(0), true, true);
 
         vm.prank(allowlisted[0]);
         vm.expectRevert(CPSC3640NFT.MerkleRootNotSet.selector);
@@ -208,6 +208,126 @@ contract CPSC3640NFTTest is Test {
         vm.prank(allowlisted[0]);
         vm.expectRevert(CPSC3640NFT.AlreadyClaimed.selector);
         nft.claim(proofs[0]);
+    }
+
+    // -----------------------------------------------------------------------
+    // Chain pinning
+    // -----------------------------------------------------------------------
+
+    function test_CannotDeployToAnotherChain() public {
+        uint256[3] memory foreign = [uint256(1), uint256(8453), uint256(137)]; // mainnet, Base, Polygon
+
+        for (uint256 i = 0; i < foreign.length; i++) {
+            vm.chainId(foreign[i]);
+            vm.expectRevert(
+                abi.encodeWithSelector(CPSC3640NFT.UnsupportedChain.selector, foreign[i])
+            );
+            new CPSC3640NFT(owner, merkleRoot, true, true);
+        }
+    }
+
+    function test_DeploysOnSepoliaAndLocal() public {
+        vm.chainId(11155111);
+        assertEq(new CPSC3640NFT(owner, merkleRoot, true, true).owner(), owner, "Sepolia");
+
+        vm.chainId(31337);
+        assertEq(new CPSC3640NFT(owner, merkleRoot, true, true).owner(), owner, "local");
+    }
+
+    // -----------------------------------------------------------------------
+    // Claiming without an allowlist
+    // -----------------------------------------------------------------------
+
+    function test_OpenClaimLetsAnyoneClaimOnce() public {
+        CPSC3640NFT open = new CPSC3640NFT(owner, bytes32(0), true, false);
+        bytes32[] memory none = new bytes32[](0);
+
+        assertFalse(open.allowlistEnabled());
+
+        vm.prank(NOT_ALLOWLISTED);
+        open.claim(none);
+        assertEq(open.ownerOf(1), NOT_ALLOWLISTED, "an address off the roster may claim");
+
+        address stranger = makeAddr("stranger");
+        vm.prank(stranger);
+        open.claim(none);
+        assertEq(open.ownerOf(2), stranger);
+
+        // One per wallet still holds. That is the only limit left.
+        vm.prank(NOT_ALLOWLISTED);
+        vm.expectRevert(CPSC3640NFT.AlreadyClaimed.selector);
+        open.claim(none);
+    }
+
+    function test_OpenClaimIgnoresAnyProofSupplied() public {
+        CPSC3640NFT open = new CPSC3640NFT(owner, bytes32(0), true, false);
+
+        bytes32[] memory junk = new bytes32[](2);
+        junk[0] = keccak256("nonsense");
+        junk[1] = keccak256("more nonsense");
+
+        vm.prank(NOT_ALLOWLISTED);
+        open.claim(junk);
+        assertEq(open.ownerOf(1), NOT_ALLOWLISTED);
+    }
+
+    function test_OwnerCanTurnTheAllowlistOffAndOn() public {
+        bytes32[] memory none = new bytes32[](0);
+
+        // On by default here: a stranger is refused.
+        vm.prank(NOT_ALLOWLISTED);
+        vm.expectRevert(CPSC3640NFT.InvalidProof.selector);
+        nft.claim(none);
+
+        vm.prank(owner);
+        nft.setAllowlistEnabled(false);
+
+        vm.prank(NOT_ALLOWLISTED);
+        nft.claim(none);
+        assertEq(nft.ownerOf(1), NOT_ALLOWLISTED);
+
+        // Turning it back on refuses new strangers but does not revoke what was claimed.
+        vm.prank(owner);
+        nft.setAllowlistEnabled(true);
+
+        address stranger = makeAddr("stranger");
+        vm.prank(stranger);
+        vm.expectRevert(CPSC3640NFT.InvalidProof.selector);
+        nft.claim(none);
+
+        assertEq(nft.ownerOf(1), NOT_ALLOWLISTED, "an existing token survives");
+    }
+
+    function test_NonOwnerCannotTurnTheAllowlistOff() public {
+        address stranger = makeAddr("stranger");
+
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, stranger));
+        nft.setAllowlistEnabled(false);
+
+        assertTrue(nft.allowlistEnabled());
+    }
+
+    function test_OpenClaimStillRespectsClaimClosed() public {
+        CPSC3640NFT open = new CPSC3640NFT(owner, bytes32(0), true, false);
+
+        vm.prank(owner);
+        open.setClaimOpen(false);
+
+        vm.prank(NOT_ALLOWLISTED);
+        vm.expectRevert(CPSC3640NFT.ClaimClosed.selector);
+        open.claim(new bytes32[](0));
+    }
+
+    function test_EligibilityViewsWhenOpen() public {
+        CPSC3640NFT open = new CPSC3640NFT(owner, bytes32(0), true, false);
+
+        assertTrue(open.canClaim(NOT_ALLOWLISTED));
+        assertTrue(open.isEligible(NOT_ALLOWLISTED, new bytes32[](0)));
+
+        vm.prank(NOT_ALLOWLISTED);
+        open.claim(new bytes32[](0));
+        assertFalse(open.canClaim(NOT_ALLOWLISTED), "already claimed");
     }
 
     // -----------------------------------------------------------------------

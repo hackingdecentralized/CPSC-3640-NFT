@@ -13,6 +13,7 @@ import {CPSC3640NFT} from "../contracts/CPSC3640NFT.sol";
 ///        MERKLE_ROOT           optional, overrides allowlist/generated/root.json
 ///        CONTRACT_OWNER        optional, defaults to the deployer
 ///        CLAIM_OPEN            optional, defaults to true
+///        REQUIRE_ALLOWLIST     optional, defaults to true. Set false to let anyone claim.
 ///
 ///      Local Anvil:
 ///        forge script script/Deploy.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
@@ -24,25 +25,34 @@ import {CPSC3640NFT} from "../contracts/CPSC3640NFT.sol";
 ///      address, block and transaction hash in deployments/sepolia.json.
 contract Deploy is Script {
     function run() external returns (CPSC3640NFT nft) {
-        // Security rule: never let a routine command put this on a production network.
-        require(block.chainid != 1, "Deploy: refusing to deploy to Ethereum mainnet");
+        // Fail here, with a readable message, before anything is broadcast. The
+        // contract's own constructor enforces the same rule and is the real backstop.
+        require(
+            block.chainid == 11155111 || block.chainid == 31337,
+            "Deploy: this contract only deploys to Sepolia (11155111) or a local node (31337)"
+        );
 
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployer = vm.addr(deployerKey);
         address owner = vm.envOr("CONTRACT_OWNER", deployer);
         bool claimOpen = vm.envOr("CLAIM_OPEN", true);
-        bytes32 merkleRoot = _merkleRoot();
+        bool requireAllowlist = vm.envOr("REQUIRE_ALLOWLIST", true);
+        bytes32 merkleRoot = requireAllowlist ? _merkleRoot() : bytes32(0);
 
-        require(merkleRoot != bytes32(0), "Deploy: merkle root is zero - run `npm run merkle`");
+        require(
+            !requireAllowlist || merkleRoot != bytes32(0),
+            "Deploy: merkle root is zero - run `npm run merkle`"
+        );
 
         console.log("chain id       ", block.chainid);
         console.log("deployer       ", deployer);
         console.log("owner          ", owner);
         console.log("claim open     ", claimOpen);
+        console.log("allowlist      ", requireAllowlist ? "required" : "OFF - anyone may claim");
         console.log("merkle root    ", vm.toString(merkleRoot));
 
         vm.startBroadcast(deployerKey);
-        nft = new CPSC3640NFT(owner, merkleRoot, claimOpen);
+        nft = new CPSC3640NFT(owner, merkleRoot, claimOpen, requireAllowlist);
         vm.stopBroadcast();
 
         console.log("CPSC3640NFT    ", address(nft));

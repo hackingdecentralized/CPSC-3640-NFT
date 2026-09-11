@@ -20,6 +20,8 @@ import {getProvider} from "./wallet";
 
 export interface ContractState {
   claimOpen: boolean;
+  /** When false the contract lets any address claim, and proofs.json is not consulted. */
+  allowlistEnabled: boolean;
   merkleRoot: Hex;
   hasClaimed: boolean;
   totalMinted: bigint;
@@ -58,14 +60,15 @@ export async function readContractState(account: Address): Promise<ContractState
   const address = contractAddress();
   const base = {address, abi: CPSC3640NFT_ABI} as const;
 
-  const [claimOpen, merkleRoot, hasClaimed, totalMinted] = await Promise.all([
+  const [claimOpen, allowlistEnabled, merkleRoot, hasClaimed, totalMinted] = await Promise.all([
     client.readContract({...base, functionName: "claimOpen"}),
+    client.readContract({...base, functionName: "allowlistEnabled"}),
     client.readContract({...base, functionName: "merkleRoot"}),
     client.readContract({...base, functionName: "hasClaimed", args: [account]}),
     client.readContract({...base, functionName: "totalMinted"})
   ]);
 
-  return {claimOpen, merkleRoot, hasClaimed, totalMinted};
+  return {claimOpen, allowlistEnabled, merkleRoot, hasClaimed, totalMinted};
 }
 
 /** Ask the contract, not proofs.json, whether this proof actually works. */

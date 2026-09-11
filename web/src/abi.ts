@@ -32,6 +32,13 @@ export const CPSC3640NFT_ABI = [
   },
   {
     type: "function",
+    name: "allowlistEnabled",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{name: "", type: "bool"}]
+  },
+  {
+    type: "function",
     name: "claimOpen",
     stateMutability: "view",
     inputs: [],
@@ -76,5 +83,6 @@ export const CPSC3640NFT_ABI = [
   {type: "error", name: "ClaimClosed", inputs: []},
   {type: "error", name: "AlreadyClaimed", inputs: []},
   {type: "error", name: "InvalidProof", inputs: []},
-  {type: "error", name: "MerkleRootNotSet", inputs: []}
+  {type: "error", name: "MerkleRootNotSet", inputs: []},
+  {type: "error", name: "UnsupportedChain", inputs: [{name: "chainId", type: "uint256"}]}
 ] as const;
