@@ -19,6 +19,26 @@ is 512x512 and not larger.
 > This is a collectible, not an official academic credential, and not a Yale-issued
 > anything. The metadata says so too.
 
+## For students: before you claim
+
+Three one-time steps. The claim page walks you through them, but here they are in full.
+
+**0. Install a wallet.** [MetaMask](https://metamask.io/download/) in Chrome, Firefox,
+Edge or Brave. Create a new wallet when it asks and keep the recovery phrase somewhere
+safe. You do not need to put any real money in it.
+
+**1. Switch to Sepolia.** Sepolia is Ethereum's test network, so nothing here costs real
+money. Connect on the claim page and it will offer to switch for you.
+
+**2. Get free test ETH.** The NFT is free, but Ethereum charges a small fee to process
+any transaction. Paste your address into the
+[Google Cloud Sepolia faucet](https://cloud.google.com/application/web3/faucet/ethereum/sepolia).
+The claim page shows your address with a copy button, and tells you if you have none.
+
+Then connect, and if your address is on the course allowlist you can claim. Your token's
+number is your place in the queue: the third person to claim gets a token stamped
+"No. 3", and that number is part of the artwork itself.
+
 ## Architecture
 
 ```
@@ -128,6 +148,8 @@ forge test -vv                # run the contract tests
 forge build --sizes           # check bytecode against the 24,576-byte limit
 npm --prefix web run dev      # claim page against Sepolia
 npm --prefix web run dev:anvil# claim page against local Anvil
+scripts/deploy.sh sepolia     # test, deploy and verify in one command
+scripts/verify.sh sepolia     # retry explorer verification on its own
 scripts/publish-pages.sh      # build and publish gh-pages
 ```
 
@@ -183,23 +205,36 @@ git-ignored. Use a throwaway key that holds nothing but Sepolia test ETH.
 cp .env.example .env
 ```
 
+`SEPOLIA_RPC_URL` and `DEPLOYER_PRIVATE_KEY` are required. `ETHERSCAN_API_KEY` is
+optional but worth setting: with it, the source is verified on Etherscan as part of the
+deploy, with no second step.
+
 **2. Build the allowlist** from `allowlist/addresses.json`:
 
 ```bash
 npm run merkle
 ```
 
-**3. Test, then deploy.**
+**3. Deploy.**
 
 ```bash
-forge test
-source .env
-forge script script/Deploy.s.sol --rpc-url "$SEPOLIA_RPC_URL" --broadcast --verify
-node scripts/save-deployment.mjs sepolia
+scripts/deploy.sh sepolia
 ```
 
-Drop `--verify` if you have no Etherscan key. The deploy script refuses to run against
-Ethereum mainnet.
+That one command runs the tests, refuses to continue if any fail, checks the deployer
+has ETH, deploys, submits the source for verification, and writes
+`deployments/sepolia.json`. Add `--no-verify` to skip the explorer step.
+
+If the contract deploys but verification fails, which happens on rate limits or before
+the explorer has indexed the creation transaction, the deployment is still recorded and
+you can retry on its own:
+
+```bash
+scripts/verify.sh sepolia
+```
+
+`verify.sh` reads the constructor arguments back out of the deployment record rather
+than guessing them, so the bytecode lines up.
 
 **4. Commit the deployment record and publish.**
 
@@ -211,6 +246,8 @@ scripts/publish-pages.sh
 `deployments/sepolia.json` is the frontend's configuration. `web/src/config.ts` imports
 it, so updating that file and rebuilding is the whole of "update deployment config".
 No chain id or contract address is written anywhere else in the frontend.
+
+The deploy script refuses to run against Ethereum mainnet, as does `Deploy.s.sol`.
 
 ## Updating the allowlist
 

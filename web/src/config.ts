@@ -40,7 +40,12 @@ export interface NetworkConfig {
    * quota to learn nothing. Anvil mines on demand, so it can be checked often.
    */
   pollIntervalMs: number;
+  /** Where a student gets free test ETH for gas. `null` on chains that need none. */
+  faucet: string | null;
 }
+
+/** Where a student without a wallet goes first. */
+export const WALLET_DOWNLOAD = "https://metamask.io/download/";
 
 const NETWORKS: Record<string, NetworkConfig> = {
   sepolia: {
@@ -48,14 +53,17 @@ const NETWORKS: Record<string, NetworkConfig> = {
     label: "Ethereum Sepolia",
     explorer: "https://sepolia.etherscan.io",
     deployment: sepoliaDeployment as Deployment,
-    pollIntervalMs: 12_000
+    pollIntervalMs: 12_000,
+    faucet: "https://cloud.google.com/application/web3/faucet/ethereum/sepolia"
   },
   anvil: {
     chain: foundry,
     label: "Local Anvil",
     explorer: null,
     deployment: anvilDeployment as Deployment,
-    pollIntervalMs: 2_000
+    pollIntervalMs: 2_000,
+    // Anvil pre-funds every account, so there is nothing to top up.
+    faucet: null
   }
 };
 

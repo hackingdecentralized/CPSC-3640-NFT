@@ -6,5 +6,6 @@
   "transactionHash": null,
   "merkleRoot": null,
   "deployer": null,
+  "constructorArgs": null,
   "deployedAt": null
 }

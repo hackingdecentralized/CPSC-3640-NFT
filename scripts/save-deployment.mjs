@@ -63,6 +63,9 @@ const record = {
   transactionHash: tx.hash,
   merkleRoot,
   deployer: tx.transaction.from,
+  // Exactly what was passed to the constructor. Explorer verification needs these
+  // to match byte for byte, so they are recorded rather than reconstructed later.
+  constructorArgs: tx.arguments ?? null,
   deployedAt: new Date().toISOString()
 };
 

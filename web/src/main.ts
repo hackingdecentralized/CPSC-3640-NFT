@@ -21,12 +21,14 @@ import {
   COURSE,
   DEPLOYMENT,
   NETWORK,
+  WALLET_DOWNLOAD,
   explorerAddress,
   explorerTx
 } from "./config";
 import {proofFor, publishedRoot} from "./allowlist";
 import {explain, type FriendlyError} from "./errors";
 import {
+  balanceOf,
   findClaimedTokenId,
   isEligibleOnChain,
   readContractState,
@@ -52,6 +54,7 @@ type Stage =
   | "disconnected"
   | "connecting"
   | "wrong-network"
+  | "needs-gas"
   | "checking"
   | "eligible"
   | "not-eligible"
@@ -74,6 +77,12 @@ interface State {
   /** A recoverable problem, shown as a banner without discarding the current stage. */
   notice?: FriendlyError;
 }
+
+/**
+ * Enough native currency to be confident the claim will go through. A claim costs
+ * roughly 150k gas; this is a generous floor, not a precise estimate.
+ */
+const COMFORTABLE_GAS_WEI = 1_000_000_000_000_000n; // 0.001 ETH
 
 const root = document.querySelector<HTMLElement>("#app")!;
 let state: State = {stage: "disconnected"};
@@ -129,20 +138,27 @@ function goto(stage: Stage, patch: Partial<State> = {}): void {
 
 const STEP_OF: Record<Stage, number> = {
   "no-wallet": 0,
-  "not-deployed": 0,
-  disconnected: 0,
-  connecting: 0,
+  "not-deployed": 1,
+  disconnected: 1,
+  connecting: 1,
   "wrong-network": 1,
-  checking: 1,
-  "not-eligible": 1,
-  "claim-closed": 1,
-  eligible: 2,
-  "awaiting-signature": 2,
-  pending: 2,
-  claimed: 3
+  "needs-gas": 1,
+  checking: 2,
+  "not-eligible": 2,
+  "claim-closed": 2,
+  eligible: 3,
+  "awaiting-signature": 3,
+  pending: 3,
+  claimed: 4
 };
 
-const STEP_LABELS = ["Connect Wallet", "Check Eligibility", "Claim NFT", "Confirmed"];
+const STEP_LABELS = [
+  "Set Up Wallet",
+  "Connect Wallet",
+  "Check Eligibility",
+  "Claim NFT",
+  "Confirmed"
+];
 
 function stepper(current: number): string {
   const items = STEP_LABELS.map((label, i) => {
@@ -180,14 +196,32 @@ function walletRow(): string {
 function panel(): string {
   switch (state.stage) {
     case "no-wallet":
-      return `<h2>A wallet is required</h2>
-        <p class="lede">This page talks to Ethereum directly from your browser.</p>
-        ${statusBlock(
-          "warn",
-          "No Ethereum wallet detected",
-          "Install MetaMask or another injected wallet, then reload this page."
-        )}
-        <div class="links"><a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer">Get MetaMask</a></div>`;
+      return `<h2>Set up a wallet</h2>
+        <p class="lede">Three one-time steps. You only ever do this once.</p>
+        ${statusBlock("warn", "No Ethereum wallet detected in this browser")}
+        <ol class="setup">
+          <li>
+            <strong>Install MetaMask.</strong>
+            Works in Chrome, Firefox, Edge and Brave. Create a new wallet when it asks,
+            and keep the recovery phrase somewhere safe.
+            <a href="${WALLET_DOWNLOAD}" target="_blank" rel="noopener noreferrer">Download MetaMask</a>
+          </li>
+          <li>
+            <strong>Switch to ${escapeHtml(NETWORK.label)}.</strong>
+            A test network, so nothing here costs real money. Come back and connect, and
+            this page will offer to switch for you.
+          </li>
+          <li>
+            <strong>Get free test ETH.</strong>
+            Claiming is free, but Ethereum charges a small fee to process any transaction.
+            ${
+              NETWORK.faucet
+                ? `<a href="${NETWORK.faucet}" target="_blank" rel="noopener noreferrer">Open the Sepolia faucet</a>`
+                : ""
+            }
+          </li>
+        </ol>
+        <button class="primary" id="reload">I have installed a wallet</button>`;
 
     case "not-deployed":
       return `<h2>Not deployed yet</h2>
@@ -220,6 +254,27 @@ function panel(): string {
           `This wallet is on chain ${state.wrongChainId}. The course NFT lives on ${NETWORK.label} (chain ${CHAIN_ID}).`
         )}
         <button class="primary" id="switch">Switch to ${escapeHtml(NETWORK.label)}</button>`;
+
+    case "needs-gas":
+      return `<h2>You need test ETH</h2>
+        ${walletRow()}
+        ${noticeBlock()}
+        ${statusBlock(
+          "warn",
+          `This wallet holds no ${escapeHtml(NETWORK.chain.nativeCurrency.symbol)} on ${escapeHtml(NETWORK.label)}`,
+          "The NFT is free, but Ethereum charges a small fee to process the claim. Test ETH costs nothing: paste your address into the faucet below, then check again."
+        )}
+        <div class="addressbox">
+          <span>Your address</span>
+          <code>${escapeHtml(state.account ?? "")}</code>
+          <button class="secondary" id="copy" data-address="${escapeHtml(state.account ?? "")}">Copy address</button>
+        </div>
+        ${
+          NETWORK.faucet
+            ? `<div class="links"><a href="${NETWORK.faucet}" target="_blank" rel="noopener noreferrer">Open the Sepolia faucet</a></div>`
+            : ""
+        }
+        <button class="secondary" id="recheck">Check again</button>`;
 
     case "checking":
       return `<h2>Checking eligibility</h2>
@@ -355,6 +410,9 @@ function render(): void {
     <p class="disclaimer">A course collectible, not an official academic credential.</p>
   `;
 
+  bind("reload", () => window.location.reload());
+  bind("copy", copyAddress);
+  bind("recheck", () => void refresh());
   bind("connect", connect);
   bind("switch", switchNetwork);
   bind("claim", claim);
@@ -368,6 +426,24 @@ function bind(id: string, handler: () => void): void {
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
+
+/** Copying beats retyping 42 hex characters into a faucet form. */
+async function copyAddress(): Promise<void> {
+  const button = document.getElementById("copy") as HTMLButtonElement | null;
+  const address = button?.dataset.address;
+  if (!button || !address) return;
+
+  try {
+    await navigator.clipboard.writeText(address);
+    button.textContent = "Copied";
+  } catch (error) {
+    console.debug("clipboard unavailable", error);
+    button.textContent = "Select it above and copy";
+  }
+  window.setTimeout(() => {
+    if (document.getElementById("copy") === button) button.textContent = "Copy address";
+  }, 2000);
+}
 
 async function connect(): Promise<void> {
   goto("connecting");
@@ -412,9 +488,10 @@ async function refresh(): Promise<void> {
       return;
     }
 
-    const [contractState, proof] = await Promise.all([
+    const [contractState, proof, balance] = await Promise.all([
       readContractState(account),
-      proofFor(account)
+      proofFor(account),
+      balanceOf(account)
     ]);
 
     // Already claimed in this or an earlier session: rebuild the success view from chain state.
@@ -450,7 +527,25 @@ async function refresh(): Promise<void> {
       return;
     }
 
-    goto("eligible", {account, proof, totalMinted: contractState.totalMinted});
+    // Only ask for gas money from someone who is actually about to spend it. A
+    // student who already claimed, or who is not on the list, needs none.
+    if (balance === 0n) {
+      goto("needs-gas", {account, totalMinted: contractState.totalMinted});
+      return;
+    }
+
+    goto("eligible", {
+      account,
+      proof,
+      totalMinted: contractState.totalMinted,
+      notice:
+        balance < COMFORTABLE_GAS_WEI
+          ? {
+              message: "This wallet is very low on test ETH.",
+              detail: "The claim may fail for lack of gas. Top up from the faucet if it does."
+            }
+          : undefined
+    });
   } catch (error) {
     goto("disconnected", {
       account,

@@ -179,6 +179,11 @@ export async function readToken(tokenId: bigint): Promise<OwnedToken> {
   };
 }
 
+/** Native balance, used to catch a student who has no gas before they try to claim. */
+export async function balanceOf(account: Address): Promise<bigint> {
+  return publicClient().getBalance({address: account});
+}
+
 /** Just the claim count. Cheap enough to re-read on a timer. */
 export async function readTotalMinted(): Promise<bigint> {
   return publicClient().readContract({
