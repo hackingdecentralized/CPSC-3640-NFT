@@ -31,9 +31,14 @@ safe. You do not need to put any real money in it.
 money. Connect on the claim page and it will offer to switch for you.
 
 **2. Get free test ETH.** The NFT is free, but Ethereum charges a small fee to process
-any transaction. Paste your address into the
-[Google Cloud Sepolia faucet](https://cloud.google.com/application/web3/faucet/ethereum/sepolia).
-The claim page shows your address with a copy button, and tells you if you have none.
+any transaction. Any Sepolia faucet works, for example:
+
+```text
+https://cloud.google.com/application/web3/faucet/ethereum/sepolia
+```
+
+Paste your address in and it sends you a small amount. The claim page shows your address
+with a copy button, and tells you when you have none.
 
 Then connect, and if your address is on the course allowlist you can claim. Your token's
 number is your place in the queue: the third person to claim gets a token stamped

@@ -133,6 +133,8 @@ code, .mono {
 .setup li::marker { color: var(--amber); font-weight: 700; }
 .setup strong { display: block; color: var(--text); font-weight: 600; margin-bottom: 2px; }
 .setup a { display: inline-block; margin-top: 6px; }
+/* A URL printed in full has to wrap, or it pushes the panel wider than its column. */
+.setup a.url { word-break: break-all; font-size: 13px; line-height: 1.4; }
 a { color: var(--amber); }
 .links { display: flex; gap: 10px; flex-wrap: wrap; }
 .links a {

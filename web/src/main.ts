@@ -216,7 +216,8 @@ function panel(): string {
             Claiming is free, but Ethereum charges a small fee to process any transaction.
             ${
               NETWORK.faucet
-                ? `<a href="${NETWORK.faucet}" target="_blank" rel="noopener noreferrer">Open the Sepolia faucet</a>`
+                ? `Any ${escapeHtml(NETWORK.label)} faucet works, for example:
+            <a class="url" href="${NETWORK.faucet}" target="_blank" rel="noopener noreferrer">${escapeHtml(NETWORK.faucet)}</a>`
                 : ""
             }
           </li>
