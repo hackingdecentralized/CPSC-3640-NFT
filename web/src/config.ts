@@ -87,7 +87,10 @@ export const CONTRACT_ADDRESS = DEPLOYMENT.contractAddress as `0x${string}` | nu
 export const COURSE = {
   code: "CPSC 3640 / CPSC 5400",
   title: "Decentralized Payments, Contracts, and Finance for Humans and AI",
-  term: "Fall 2026"
+  term: "Fall 2026",
+  /** Fixed to the course year on purpose: a published page should not silently re-date itself. */
+  year: 2026,
+  site: "https://cpsc3640.netlify.app/"
 } as const;
 
 /** Where the claim page fetches Merkle proofs from. Respects the GitHub Pages base path. */

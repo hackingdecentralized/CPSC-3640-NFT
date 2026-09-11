@@ -408,7 +408,10 @@ function render(): void {
       <section class="card stack">${panel()}</section>
     </div>
     ${chainbar()}
-    <p class="disclaimer">A course collectible, not an official academic credential.</p>
+    <p class="disclaimer">
+      &copy; ${COURSE.year}, ${escapeHtml(COURSE.code)},
+      <a href="${COURSE.site}" target="_blank" rel="noopener noreferrer">${escapeHtml(COURSE.site)}</a>
+    </p>
   `;
 
   bind("reload", () => window.location.reload());

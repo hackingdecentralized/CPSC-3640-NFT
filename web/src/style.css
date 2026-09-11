@@ -151,3 +151,5 @@ a { color: var(--amber); }
 }
 .chainbar span { color: var(--text); }
 .disclaimer { margin-top: 18px; text-align: center; color: var(--muted); font-size: 12.5px; }
+.disclaimer a { color: var(--muted); text-decoration: none; }
+.disclaimer a:hover { color: var(--amber); text-decoration: underline; }
