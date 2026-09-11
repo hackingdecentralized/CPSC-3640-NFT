@@ -30,6 +30,8 @@ export interface OwnedToken {
   /** The `image` field decoded out of the on-chain tokenURI. */
   image: string;
   name: string;
+  /** Current holder. Not necessarily the claimer: these tokens are transferable. */
+  owner: Address;
 }
 
 /** Typed separately from the ABI so `getLogs` can infer `args.tokenId`. */
@@ -147,12 +149,15 @@ export async function findClaimedTokenId(
  * what the student sees is what the contract will hand any wallet or marketplace.
  */
 export async function readToken(tokenId: bigint): Promise<OwnedToken> {
-  const uri = await publicClient().readContract({
-    address: contractAddress(),
-    abi: CPSC3640NFT_ABI,
-    functionName: "tokenURI",
-    args: [tokenId]
-  });
+  const [uri, holder] = await Promise.all([
+    publicClient().readContract({
+      address: contractAddress(),
+      abi: CPSC3640NFT_ABI,
+      functionName: "tokenURI",
+      args: [tokenId]
+    }),
+    ownerOf(tokenId)
+  ]);
 
   const prefix = "data:application/json;base64,";
   if (!uri.startsWith(prefix)) {
@@ -169,7 +174,8 @@ export async function readToken(tokenId: bigint): Promise<OwnedToken> {
   return {
     tokenId,
     image: metadata.image,
-    name: metadata.name ?? `Token #${tokenId}`
+    name: metadata.name ?? `Token #${tokenId}`,
+    owner: holder
   };
 }
 

@@ -66,6 +66,8 @@ interface State {
   proof?: Hex[];
   txHash?: Hex;
   token?: OwnedToken;
+  /** Tokens minted so far. Token ids are claim order, so this is the queue length. */
+  totalMinted?: bigint;
   /** True once a submitted transaction has been outstanding long enough to mention. */
   slow?: boolean;
   /** A recoverable problem, shown as a banner without discarding the current stage. */
@@ -85,6 +87,17 @@ function escapeHtml(value: string): string {
     /[&<>"']/g,
     (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"})[c]!
   );
+}
+
+/** 1 -> "1st", 12 -> "12th", 23 -> "23rd". Used to say where in the queue a wallet landed. */
+function ordinal(n: bigint | number): string {
+  const value = Number(n);
+  const lastTwo = value % 100;
+  const suffix =
+    lastTwo >= 11 && lastTwo <= 13
+      ? "th"
+      : ({1: "st", 2: "nd", 3: "rd"}[value % 10] ?? "th");
+  return `${value}${suffix}`;
 }
 
 function shorten(value: string, lead = 6, tail = 4): string {
@@ -221,12 +234,18 @@ function panel(): string {
         ${walletRow()}
         ${statusBlock("warn", "Claiming is currently closed", "The course staff have paused new claims.")}`;
 
-    case "eligible":
+    case "eligible": {
+      const next = (state.totalMinted ?? 0n) + 1n;
       return `<h2>You are eligible</h2>
         ${walletRow()}
         ${noticeBlock()}
-        ${statusBlock("good", "Eligible to claim", "One NFT per wallet. Your wallet will ask you to approve the transaction.")}
+        ${statusBlock(
+          "good",
+          `You will be the ${ordinal(next)} to claim`,
+          "One NFT per wallet. Your claim number is minted into the artwork itself."
+        )}
         <button class="primary" id="claim">Claim Course NFT</button>`;
+    }
 
     case "awaiting-signature":
       return `<h2>Confirm in your wallet</h2>
@@ -245,15 +264,34 @@ function panel(): string {
     }
 
     case "claimed": {
+      const tokenId = state.token?.tokenId;
+      // Tokens are transferable, so the claimer and the current holder can differ.
+      const holder = state.token?.owner;
+      const stillHeld = !holder || !state.account || holder.toLowerCase() === state.account.toLowerCase();
       const txLink = state.txHash ? explorerTx(state.txHash) : null;
       const contractLink = CONTRACT_ADDRESS ? explorerAddress(CONTRACT_ADDRESS) : null;
       return `<h2>NFT claimed!</h2>
         <p class="lede">${escapeHtml(COURSE.code)} &mdash; ${escapeHtml(COURSE.term)}</p>
         ${noticeBlock()}
-        ${statusBlock("good", "This wallet owns the course NFT", "Metadata and artwork are stored entirely on-chain.")}
+        ${statusBlock(
+          stillHeld ? "good" : "info",
+          tokenId === undefined
+            ? "This wallet owns the course NFT"
+            : `You were the ${ordinal(tokenId)} to claim`,
+          stillHeld
+            ? "Metadata and artwork are stored entirely on-chain, your claim number included."
+            : "This token has since been transferred to another address. The claim record is permanent either way."
+        )}
         <dl class="rows">
-          <div><dt>Token</dt><dd class="mono">#${state.token?.tokenId ?? "?"}</dd></div>
-          <div><dt>Owner</dt><dd class="mono">${shorten(state.account ?? "")}</dd></div>
+          <div><dt>Token</dt><dd class="mono">#${tokenId ?? "?"}</dd></div>
+          ${
+            tokenId === undefined
+              ? ""
+              : `<div><dt>Claim order</dt><dd>${escapeHtml(ordinal(tokenId))}${
+                  state.totalMinted ? ` of ${state.totalMinted} so far` : ""
+                }</dd></div>`
+          }
+          <div><dt>Owner</dt><dd class="mono">${shorten(holder ?? state.account ?? "")}</dd></div>
         </dl>
         <div class="links">
           ${txLink ? `<a href="${txLink}" target="_blank" rel="noopener noreferrer">View transaction</a>` : ""}
@@ -368,7 +406,7 @@ async function refresh(): Promise<void> {
 
     // Already claimed in this or an earlier session: rebuild the success view from chain state.
     if (contractState.hasClaimed) {
-      await showOwnedToken(account);
+      await showOwnedToken(account, contractState.totalMinted);
       return;
     }
 
@@ -399,7 +437,7 @@ async function refresh(): Promise<void> {
       return;
     }
 
-    goto("eligible", {account, proof});
+    goto("eligible", {account, proof, totalMinted: contractState.totalMinted});
   } catch (error) {
     goto("disconnected", {
       account,
@@ -408,19 +446,29 @@ async function refresh(): Promise<void> {
   }
 }
 
-async function showOwnedToken(account: Address, txHash?: Hex): Promise<void> {
+async function showOwnedToken(
+  account: Address,
+  totalMinted?: bigint,
+  txHash?: Hex
+): Promise<void> {
   try {
     const found = await findClaimedTokenId(account);
     if (!found) {
-      goto("claimed", {account, txHash});
+      goto("claimed", {account, txHash, totalMinted});
       return;
     }
     const token = await readToken(found.tokenId);
-    goto("claimed", {account, token, txHash: txHash ?? found.transactionHash});
+    goto("claimed", {
+      account,
+      token,
+      totalMinted,
+      txHash: txHash ?? found.transactionHash
+    });
   } catch (error) {
     goto("claimed", {
       account,
       txHash,
+      totalMinted,
       notice: explain(error, "You own the NFT, but its artwork could not be loaded right now.")
     });
   }
@@ -436,7 +484,12 @@ async function claim(): Promise<void> {
   try {
     hash = await submitClaim(account, proof, walletClient(account));
   } catch (error) {
-    goto("eligible", {account, proof, notice: explain(error, "The claim could not be submitted.")});
+    goto("eligible", {
+      account,
+      proof,
+      totalMinted: state.totalMinted,
+      notice: explain(error, "The claim could not be submitted.")
+    });
     return;
   }
 
@@ -454,6 +507,7 @@ async function claim(): Promise<void> {
     goto("eligible", {
       account,
       proof,
+      totalMinted: state.totalMinted,
       notice: explain(error, "The transaction did not complete successfully.")
     });
   }
