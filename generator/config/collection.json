@@ -1,0 +1,4 @@
+{
+  "$comment": "The salt mixed into every card's seed. Public on purpose: the claim page draws each student's card in their own browser, so the browser must know it, and anyone can therefore predict the card for a given token id and address. Once claiming opens, do not change this file, anything else in config/, or assets/: the page shows students cards drawn from them, and the reveal must reproduce exactly those cards.",
+  "salt": "cpsc3640-fall-2026-course-nft-v1"
+}

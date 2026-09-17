@@ -51,6 +51,17 @@ if [ -f allowlist/generate-merkle.ts ] && [ -d node_modules ]; then
   npm run --silent merkle
 fi
 
+# The claim page draws each student's card from layers the generator exports. They
+# are derived, so they are rebuilt here, from the checkout being published.
+say "Exporting card layers"
+if [ -f generator/package-lock.json ]; then
+  npm --prefix generator ci --silent
+else
+  npm --prefix generator install --silent
+fi
+npm --prefix generator run --silent prepare-assets
+npm --prefix generator run --silent export-web
+
 say "Building web/"
 npm --prefix web run build
 
@@ -59,6 +70,7 @@ say "Validating build output"
 [ -f web/dist/index.html ] || die "web/dist/index.html is missing - the build produced nothing"
 [ -d web/dist/assets ] || die "web/dist/assets/ is missing - the build looks incomplete"
 grep -q 'assets/' web/dist/index.html || die "web/dist/index.html references no assets"
+[ -f web/dist/nft/index.json ] || die "web/dist/nft/ is missing - the page could not draw cards"
 
 # 5. Stage exactly the build output ------------------------------------------
 say "Staging build output"
@@ -77,7 +89,8 @@ if find "$STAGE" -name '.env*' -o -name '*.key' -o -name 'id_rsa*' | grep -q .; 
 fi
 
 echo "    Publishing:"
-(cd "$STAGE" && find . -type f | sed 's|^\./|      |' | sort)
+(cd "$STAGE" && find . -type f -not -path './nft/*' | sed 's|^\./|      |' | sort)
+echo "      nft/: $(find "$STAGE/nft" -type f | wc -l | tr -d ' ') card layer files"
 
 # 6. Commit the tree without checking the branch out -------------------------
 say "Building $BRANCH commit"

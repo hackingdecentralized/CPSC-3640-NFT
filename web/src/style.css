@@ -69,9 +69,32 @@ body {
   background: var(--panel); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 22px;
 }
-.art { padding: 14px; }
+/* A figure carries 40px side margins by default, which made this column narrower than the panel. */
+.art { margin: 0; padding: 14px; }
 .art img, .art svg { display: block; width: 100%; height: auto; border-radius: 8px; }
 .art figcaption { margin-top: 10px; text-align: center; color: var(--muted); font-size: 13px; }
+
+/* The six designs, shown before claiming. */
+.designs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.designs figure { margin: 0; min-width: 0; }
+.designs img, .designs .tile {
+  display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 6px; background: var(--ink-2);
+}
+.designs figcaption {
+  margin-top: 5px; font-size: 12px; line-height: 1.35; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.designs figcaption span { display: block; color: var(--muted); font-size: 11.5px; }
+/* Three small tiles keep the grid about as tall as one card, so on a phone the claim
+   panel below it stays close to the top. */
+@media (max-width: 480px) {
+  .designs { gap: 8px; }
+  .designs figcaption { font-size: 11px; }
+  .designs figcaption span { font-size: 10.5px; }
+}
+
+/* Holds the card's square while it is drawn, so nothing jumps when it arrives. */
+.pending-card { aspect-ratio: 1; display: flex; flex-direction: column; justify-content: center; padding: 8%; }
 
 h2 { margin: 0 0 6px; font-size: 19px; }
 .lede { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
@@ -96,6 +119,15 @@ code, .mono {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   font-size: 13px;
 }
+
+/* A card's traits, two to a row. Rare values get the accent colour. */
+.traits { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.traits div { min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.traits dt { color: var(--muted); font-size: 11.5px; letter-spacing: 0.3px; }
+.traits dd { margin: 2px 0 0; font-size: 13.5px; overflow-wrap: anywhere; }
+.traits dd span { color: var(--muted); font-size: 12px; }
+.traits .rare { border-color: var(--amber-dim); }
+.traits .rare dd span { color: var(--amber); }
 
 /* ---- status blocks ---- */
 .status { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 10px; font-size: 14px; }

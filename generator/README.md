@@ -6,8 +6,9 @@ course NFT. Six base templates, layered traits, and one rule above all others:
 > Randomness changes details, not identity. Every token must still read as the
 > CPSC 3640 / CPSC 5400 Fall 2026 course NFT.
 
-This package stands alone. It does not touch the contract or the claim website, and
-needs no IPFS account to render.
+The claim page runs this package's trait code in the browser, so a student sees the card
+their token will be generated with the moment they claim. Rendering needs no IPFS
+account; only publishing the finished collection does.
 
 ## Quick start
 
@@ -15,7 +16,7 @@ needs no IPFS account to render.
 cd generator
 npm ci
 npm run prepare-assets     # build the 1024px bases and masks (about 5 s)
-npm test                   # 70 tests, including pixel checks on real renders
+npm test                   # the test suite, including pixel checks on real renders
 npm run preview -- --count 20
 open output/preview/index.html
 ```
@@ -23,7 +24,7 @@ open output/preview/index.html
 ## How a token is made
 
 ```
-tokenId, walletAddress, salt
+tokenId, claimer address, collection salt
         |
         v  seed = SHA256(tokenId ":" lowercase(wallet) ":" salt)
         |
@@ -56,23 +57,33 @@ alphabetical order, so reordering keys in a JSON file never changes an outcome.
 
 ### The salt
 
-The salt decides whether a student can know their result before minting.
+The live collection's salt is **public**, in `config/collection.json`. That is a
+deliberate trade, and the spec allows it provided it is written down (section 27):
 
-- **Previews and simulations** use the public salt `cpsc3640-public-preview-salt`.
-  Those are not real tokens.
-- **Real tokens need a secret salt**, kept in `generator/.env` as `NFT_SALT` and never
-  in the repository or the website. With a public salt, anyone could compute the
-  traits for the next token id from any wallet address, and grind throwaway wallets
-  until one lands on `bulldog_special`.
+- **What it buys.** The claim page draws each student's card in their own browser the
+  moment they claim, with no server and no waiting for a reveal. A browser can only do
+  that if it knows the salt.
+- **What it costs.** Anyone can compute the card for any token id and address. Token
+  ids are handed out by the contract in claim order, so a student can look up what
+  claiming as number N would give them and try to time their claim, or, with the
+  allowlist off, try several wallets. Rarity is fair to people who just claim; it is
+  not proof against someone determined to game it.
 
-Because the salt is secret, generation has to happen off the website: run it here, or
-in a controlled CI job, after tokens are claimed. If you later want the public to be
-able to verify the draw, publish `SHA256(salt)` now as a commitment and reveal the
-salt once claiming closes.
+If unpredictable rarity matters more than the instant card, switch to a secret salt:
+keep it out of the repository, generate after claiming closes, and give up drawing
+cards on the page. `--salt` on `npm run generate` exists for experiments like that.
 
-Use the address that **claimed** the token, from the contract's `Claimed` event, not
-whoever holds it today. Tokens are transferable, and a token's image should not change
-when it changes hands.
+Previews and rarity simulations use a separate salt, `cpsc3640-public-preview-salt`,
+because they are samples and not the collection.
+
+A card is drawn from the address that **claimed** the token, not whoever holds it
+today. The contract records it as `claimerOf(tokenId)`; tokens are transferable, and a
+card should not change when it changes hands.
+
+**Once claiming opens, freeze `config/` and `assets/`.** Students have already been shown
+cards drawn from them. Changing a weight, a rule, the layout, a template or the salt
+changes what those students would be sent. The collection fingerprint (below) exists to
+catch exactly that.
 
 ## Configuration
 
@@ -85,6 +96,7 @@ to run against an invalid configuration and lists every problem at once.
 | `traits.json` | every trait group and its weights; each group sums to 100 |
 | `compatibility.json` | per-template preferred and avoided values |
 | `layout.json` | every coordinate: border, protected text, slots, halo centre |
+| `collection.json` | the live collection's public salt |
 
 ### Template rules
 
@@ -128,10 +140,12 @@ regions in `layout.json`. Three things keep them intact:
 | `npm run build-overlays` | regenerate every overlay SVG from `scripts/build-overlays.ts` |
 | `npm run validate-assets` | check sources are unchanged, prepared assets are current, masks protect the text, and every overlay exists at the right size |
 | `npm run asset-sheet` | `output/asset-sheet/index.html`: regions, masks, showcase renders, every overlay |
-| `npm run generate -- --token-id 123 --wallet 0x...` | one token; add `--badge staff`, `--base bulldog_special`, `--cid`, `--out` |
+| `npm run generate -- --token-id 123 --wallet 0x...` | one token, with the collection salt; add `--badge staff`, `--base bulldog_special`, `--cid`, `--out`, `--salt` |
 | `npm run preview -- --count 20` | `output/preview/index.html` |
 | `npm run rarity -- --count 10000` | `output/rarity-report.{json,md}`, no rendering |
-| `npm run set-image-cid -- --cid <CID>` | point metadata at uploaded images |
+| `npm run export-web` | the card layers the claim page draws with, into `../web/public/nft/` |
+| `npm run collection -- --network sepolia` | every claimed token, read from the contract, into `output/collection/sepolia/` |
+| `npm run set-image-cid -- --dir <dir> --cid <CID>` | point metadata at uploaded images |
 | `npm test` | the test suite |
 
 ### Reserved badges
@@ -158,23 +172,68 @@ sampling without replacement already accounted for. Any value more than four sta
 errors from expectation is flagged and the command exits non-zero, because at that
 distance the cause is a bug rather than luck.
 
-## Publishing to IPFS
+## The claim page
 
+`web/` imports the modules in `src/` that are marked browser-safe (a test keeps them
+free of Node built-ins) along with `config/` itself. It picks traits with `planToken`
+and stacks layers with `layerStack`, the same functions the generator uses, so the
+traits a student sees are the traits their token gets.
+
+Pixels come from `npm run export-web`: every layer raster the renderer can use, written
+as lossless WebP, about 7 MB in all and roughly 1 MB for any one card. The page stacks
+them on a canvas. Compositing uses the standard W3C formulas on both sides:
+`src/composite.ts` in Node, the canvas's own `source-over` and `screen` in the browser.
+Background and halo rasters carry their alpha squared, which keeps their glow soft at
+the mask's edge.
+
+Measured on a real claim: the page's card matched the generated PNG to within 2 levels
+out of 255 on every channel, with 93% of values identical. The downloaded image and
+the revealed one look the same. They are not byte-identical files.
+
+The page's footer shows a **collection fingerprint**: a digest of the salt, weights,
+rules, layout and template hashes. `npm run collection -- --expect <fingerprint>`
+refuses to generate if this checkout disagrees with the page students used.
+
+`web/public/nft/` is derived and not committed. `scripts/publish-pages.sh` rebuilds it
+before every publish.
+
+## Revealing the collection
+
+The contract serves an on-chain placeholder until the owner points it at uploaded
+metadata. `setBaseURI(uri, count)` reveals tokens `1..count`. Anything claimed after the
+collection was generated keeps the placeholder until the next reveal, so a reveal never
+points a token at a file that does not exist.
+
+```bash
+cd generator
+npm run collection -- --network sepolia --expect <fingerprint from the page>
+# upload output/collection/sepolia/images as one directory to any IPFS pinning service
+npm run set-image-cid -- --dir output/collection/sepolia --cid <IMAGE_CID>
+# upload output/collection/sepolia/metadata as one directory
+cd ..
+scripts/reveal.sh sepolia publish <METADATA_CID>
 ```
-npm run generate ...           # for every claimed token
-upload output/images/          # to any IPFS pinning service
-npm run set-image-cid -- --cid <IMAGE_CID>
-upload output/metadata/        # gives a metadata CID
+
+`publish` downloads the last token's metadata and image back through a gateway and
+refuses to continue unless both match what was generated. Set `IPFS_GATEWAY` to your
+pinning service's gateway if the public one is slow to see a new upload.
+
+You can reveal as often as you like while claiming is open; each run covers everyone who
+has claimed so far. To finish:
+
+```bash
+scripts/reveal.sh sepolia close      # no more claims
+# generate, upload and publish once more, as above
+scripts/reveal.sh sepolia freeze     # permanent; claiming can never reopen
 ```
 
-Metadata starts with `ipfs://IMAGE_CID_PENDING/<id>.png`. `set-image-cid` rewrites it
-and can be re-run. No provider is assumed.
+`freeze` requires every token to be revealed, and it ends claiming for good: an IPFS
+directory cannot gain files, so a token minted afterwards could never get its card.
+`scripts/reveal.sh sepolia status` shows where things stand.
 
-**The deployed contract cannot show these images yet.** Its `tokenURI` returns the one
-image embedded in its own bytecode. Serving generated art needs a contract whose
-`tokenURI` returns `ipfs://<METADATA_CID>/<id>.json`, and that means a new deployment.
-Remember that pinned content only stays available while someone keeps paying for the
-pin.
+No IPFS provider is assumed. Pinned content stays available only while someone keeps
+paying for the pin. The first Sepolia deployment predates all of this and can never
+show generated cards; revealing needs the current contract.
 
 ## Assets
 

@@ -12,58 +12,18 @@
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
-say()  { printf '\033[1m==>\033[0m %s\n' "$*"; }
-warn() { printf '\033[33mwarning:\033[0m %s\n' "$*"; }
-die()  { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+. scripts/lib.sh
 
 NETWORK="${1:-}"
 [ -n "$NETWORK" ] || die "usage: scripts/deploy.sh <sepolia|anvil> [--no-verify]"
 VERIFY=1
 [ "${2:-}" = "--no-verify" ] && VERIFY=0
 
-case "$NETWORK" in
-  sepolia) CHAIN_ID=11155111 ;;
-  anvil|localhost) CHAIN_ID=31337; VERIFY=0 ;;
-  *) die "unknown network '$NETWORK'. Expected sepolia or anvil." ;;
-esac
+use_network "$NETWORK"
+[ "$CHAIN_ID" = 31337 ] && VERIFY=0
 
 # 1. Secrets ------------------------------------------------------------------
-# .env fills in what the environment has not already provided, so an explicit
-# `DEPLOYER_PRIVATE_KEY=... scripts/deploy.sh anvil` is not silently overridden
-# by the Sepolia credentials sitting in the file.
-_preset_key="${DEPLOYER_PRIVATE_KEY:-}"
-_preset_rpc="${SEPOLIA_RPC_URL:-}"
-_preset_scan="${ETHERSCAN_API_KEY:-}"
-
-if [ -f .env ]; then
-  set -a; . ./.env; set +a
-elif [ "$NETWORK" != "anvil" ]; then
-  die "no .env file. Copy .env.example to .env and fill it in."
-fi
-
-[ -n "$_preset_key" ] && DEPLOYER_PRIVATE_KEY="$_preset_key"
-[ -n "$_preset_rpc" ] && SEPOLIA_RPC_URL="$_preset_rpc"
-[ -n "$_preset_scan" ] && ETHERSCAN_API_KEY="$_preset_scan"
-
-if [ "$NETWORK" = "sepolia" ]; then
-  [ -n "${SEPOLIA_RPC_URL:-}" ] || die "SEPOLIA_RPC_URL is not set in .env"
-  [ -n "${DEPLOYER_PRIVATE_KEY:-}" ] || die "DEPLOYER_PRIVATE_KEY is not set in .env"
-  RPC_URL="$SEPOLIA_RPC_URL"
-else
-  RPC_URL="${ANVIL_RPC_URL:-http://127.0.0.1:8545}"
-  : "${DEPLOYER_PRIVATE_KEY:?set DEPLOYER_PRIVATE_KEY to an Anvil key for local deploys}"
-fi
-
-# Foundry insists on the 0x prefix and its error message for a bare key is cryptic.
-# Accept both spellings and fail here, clearly, on anything that is not a 32-byte key.
-case "$DEPLOYER_PRIVATE_KEY" in
-  0x*) ;;
-  *) DEPLOYER_PRIVATE_KEY="0x$DEPLOYER_PRIVATE_KEY" ;;
-esac
-if ! printf '%s' "$DEPLOYER_PRIVATE_KEY" | grep -qE '^0x[0-9a-fA-F]{64}$'; then
-  die "DEPLOYER_PRIVATE_KEY is not a 32-byte hex key (expected 0x + 64 hex characters)"
-fi
-export DEPLOYER_PRIVATE_KEY
+load_env "$NETWORK" 1
 
 DEPLOYER_ADDRESS="$(cast wallet address --private-key "$DEPLOYER_PRIVATE_KEY")"
 

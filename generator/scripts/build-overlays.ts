@@ -12,7 +12,7 @@
  */
 import {mkdirSync, writeFileSync} from "node:fs";
 import {dirname} from "node:path";
-import {loadConfig} from "../src/config";
+import {loadConfig} from "../src/loadConfig";
 import {fromRoot} from "../src/paths";
 import {Rng} from "../src/random";
 import {sha256Hex} from "../src/seed";

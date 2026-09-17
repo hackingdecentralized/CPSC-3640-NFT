@@ -12,7 +12,8 @@
 import {mkdirSync, readFileSync, rmSync, writeFileSync} from "node:fs";
 import {join} from "node:path";
 import sharp from "sharp";
-import {allSlots, loadConfig, slotRect} from "../src/config";
+import {allSlots, slotRect} from "../src/config";
+import {loadConfig} from "../src/loadConfig";
 import {maskPath, overlayPath} from "../src/assets";
 import {fromRoot} from "../src/paths";
 import {renderImage} from "../src/renderer";

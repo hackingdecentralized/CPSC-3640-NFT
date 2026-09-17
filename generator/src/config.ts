@@ -1,12 +1,13 @@
 /**
- * Loading and validating configuration (spec section 11).
+ * Validating configuration (spec section 11).
  *
  * Validation is strict and reports every problem at once. Generation refuses to run
  * against an invalid configuration: a typo in a trait name should fail loudly here,
  * not quietly produce a collection with a missing layer.
+ *
+ * Pure: no file system. Node reads the JSON in src/loadConfig.ts; the claim page
+ * imports the same JSON files and calls buildConfig directly.
  */
-import {readFileSync} from "node:fs";
-import {fromRoot} from "./paths";
 import {FULL_GROUP, toEntries, toUnits, totalUnits} from "./weights";
 import {
   ALL_GROUPS,
@@ -31,18 +32,23 @@ export class ConfigError extends Error {
 /** A compatibility multiplier above this could overflow the integer weight math. */
 const MAX_MULTIPLIER = 100;
 
-const readJson = <T>(relativePath: string): T =>
-  JSON.parse(readFileSync(fromRoot(relativePath), "utf8")) as T;
-
 const stripComments = <T extends object>(value: T): T =>
   Object.fromEntries(Object.entries(value).filter(([key]) => !key.startsWith("$"))) as T;
 
-export function loadConfig(): GeneratorConfig {
+export interface RawConfig {
+  baseTemplates: unknown;
+  traits: unknown;
+  compatibility: unknown;
+  layout: unknown;
+}
+
+/** Turn the four parsed JSON files into a validated configuration. */
+export function buildConfig(raw: RawConfig): GeneratorConfig {
   const config: GeneratorConfig = {
-    baseTemplates: stripComments(readJson("config/base-templates.json")),
-    traits: stripComments(readJson("config/traits.json")),
-    compatibility: stripComments(readJson<Compatibility>("config/compatibility.json")),
-    layout: stripComments(readJson<Layout>("config/layout.json"))
+    baseTemplates: stripComments(raw.baseTemplates as GeneratorConfig["baseTemplates"]),
+    traits: stripComments(raw.traits as GeneratorConfig["traits"]),
+    compatibility: stripComments(raw.compatibility as Compatibility),
+    layout: stripComments(raw.layout as Layout)
   };
   assertValidConfig(config);
   return config;

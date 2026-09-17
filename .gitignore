@@ -35,3 +35,5 @@ generator/assets/base/
 generator/assets/masks/
 generator/assets/.prepared.json
 generator/.env
+# Card layers for the claim page, from `npm run export-web` in generator/.
+web/public/nft/

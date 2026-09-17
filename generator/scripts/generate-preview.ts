@@ -9,7 +9,7 @@
 import {mkdirSync, rmSync, writeFileSync} from "node:fs";
 import {join, relative} from "node:path";
 import sharp from "sharp";
-import {loadConfig} from "../src/config";
+import {loadConfig} from "../src/loadConfig";
 import {generateNFT} from "../src/generator";
 import {fromRoot} from "../src/paths";
 import {PUBLIC_PREVIEW_SALT, TEST_WALLETS, intArg, parseArgs, run} from "./cli";

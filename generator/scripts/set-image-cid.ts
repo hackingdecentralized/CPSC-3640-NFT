@@ -8,13 +8,17 @@
  * particular IPFS provider.
  *
  *   npm run set-image-cid -- --cid bafy...
- *   npm run set-image-cid -- --cid bafy... --dir output/preview
+ *   npm run set-image-cid -- --cid bafy... --dir output/collection/sepolia
+ *
+ * In a directory from `npm run collection`, the CID is also recorded in its
+ * collection.json, where `scripts/reveal.sh` checks for it.
  */
 import {existsSync, readdirSync, readFileSync, writeFileSync} from "node:fs";
 import {join, resolve} from "node:path";
 import {imageFileName, imageUri, type NftMetadata} from "../src/metadata";
 import {fromRoot} from "../src/paths";
 import {parseArgs, run, stringArg} from "./cli";
+import {COLLECTION_MANIFEST, type CollectionManifest} from "./manifest";
 
 /** CIDv0 (Qm..., base58btc) or CIDv1 in base32 (b...) or base58btc (z...). */
 export function isPlausibleCid(cid: string): boolean {
@@ -50,6 +54,14 @@ run(() => {
     writeFileSync(path, JSON.stringify(metadata, null, 2) + "\n");
     updated++;
     if (!existsSync(join(dir, "images", imageFileName(tokenId)))) missingImages.push(tokenId);
+  }
+
+  const manifestPath = join(dir, COLLECTION_MANIFEST);
+  if (existsSync(manifestPath)) {
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as CollectionManifest;
+    if (updated !== manifest.count) throw new Error(`${metadataDir} holds ${updated} metadata files, but the collection has ${manifest.count}`);
+    manifest.imageCid = cid;
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
   }
 
   console.log(`Set image CID ${cid} on ${updated} metadata file(s) in ${metadataDir}`);

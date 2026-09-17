@@ -3,12 +3,13 @@
  */
 import {mkdirSync, writeFileSync} from "node:fs";
 import {join} from "node:path";
-import {loadConfig} from "./config";
+import {loadConfig} from "./loadConfig";
 import {buildMetadata, imageFileName, metadataFileName, PENDING_CID, type NftMetadata} from "./metadata";
 import {fromRoot} from "./paths";
 import {renderImage} from "./renderer";
-import {deriveSeed, normalizeTokenId, type TokenIdInput} from "./seed";
-import {planTraits, type ForcedTraits, type Plan} from "./traits";
+import {normalizeTokenId, type TokenIdInput} from "./seed";
+import {planToken} from "./token";
+import type {ForcedTraits, Plan} from "./traits";
 import type {GeneratorConfig, Traits} from "./types";
 
 export interface GenerateInput {
@@ -37,8 +38,7 @@ const configOrDefault = (config?: GeneratorConfig) => config ?? (defaultConfig ?
 
 /** Choose traits only. No image work, so it is cheap enough for 10,000-token simulations. */
 export function planNFT(input: Omit<GenerateInput, "outputDir" | "imageCid">, config?: GeneratorConfig): Plan {
-  const seed = deriveSeed(input.tokenId, input.walletAddress, input.salt);
-  return planTraits(configOrDefault(config), seed, input.forcedTraits);
+  return planToken(configOrDefault(config), input.tokenId, input.walletAddress, input.salt, input.forcedTraits);
 }
 
 export async function generateNFT(input: GenerateInput, config?: GeneratorConfig): Promise<GenerateOutput> {

@@ -37,17 +37,22 @@ export function intArg(args: Args, key: string, fallback: number): number {
 }
 
 /**
- * Values from generator/.env, without overriding the real environment. Kept
- * dependency-free on purpose: KEY=value lines, # comments, optional quotes.
+ * Fill in the named variables from generator/.env, then from the repository's .env,
+ * without overriding the real environment. Only the names asked for are read, so a
+ * script that needs an RPC URL never also loads the deployer's key. Kept
+ * dependency-free: KEY=value lines, # comments, optional quotes.
  */
-export function loadDotEnv(): void {
-  const path = fromRoot(".env");
-  if (!existsSync(path)) return;
-  for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
-    const match = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
-    if (!match || line.trim().startsWith("#")) continue;
-    const [, key, raw] = match as unknown as [string, string, string];
-    if (process.env[key] === undefined) process.env[key] = raw.replace(/^(['"])(.*)\1$/, "$2");
+export function loadDotEnv(names: readonly string[]): void {
+  for (const path of [fromRoot(".env"), fromRoot("..", ".env")]) {
+    if (!existsSync(path)) continue;
+    for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
+      const match = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
+      if (!match || line.trim().startsWith("#")) continue;
+      const [, key, raw] = match as unknown as [string, string, string];
+      if (!names.includes(key) || process.env[key]) continue;
+      const value = raw.replace(/^(['"])(.*)\1$/, "$2");
+      if (value) process.env[key] = value;
+    }
   }
 }
 
@@ -66,8 +71,8 @@ export const TEST_WALLETS = [
 ];
 
 /**
- * The salt used for previews and rarity simulations. It is public on purpose:
- * previews are not real tokens. Never use it for a real collection.
+ * The salt for previews and rarity simulations, which are samples rather than the
+ * collection. The live collection's salt is in config/collection.json.
  */
 export const PUBLIC_PREVIEW_SALT = "cpsc3640-public-preview-salt";
 

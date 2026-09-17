@@ -1,4 +1,4 @@
-import {loadConfig} from "../src/config";
+import {loadConfig} from "../src/loadConfig";
 import {deriveSeed} from "../src/seed";
 import type {GeneratorConfig} from "../src/types";
 

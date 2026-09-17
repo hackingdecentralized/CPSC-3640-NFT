@@ -12,7 +12,9 @@
     "generate": "tsx scripts/generate-one.ts",
     "preview": "tsx scripts/generate-preview.ts",
     "rarity": "tsx scripts/rarity-report.ts",
+    "collection": "tsx scripts/collection.ts",
     "set-image-cid": "tsx scripts/set-image-cid.ts",
+    "export-web": "tsx scripts/export-web.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -20,7 +22,8 @@
     "node": ">=20"
   },
   "dependencies": {
-    "sharp": "0.33.5"
+    "sharp": "0.33.5",
+    "viem": "2.56.3"
   },
   "devDependencies": {
     "@types/node": "22.10.2",

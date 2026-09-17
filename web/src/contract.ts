@@ -18,7 +18,17 @@ import {CHAIN, CONTRACT_ADDRESS, DEPLOYMENT} from "./config";
 import {CPSC3640NFT_ABI} from "./abi";
 import {getProvider} from "./wallet";
 
-export interface ContractState {
+export interface RevealState {
+  /**
+   * Whether this deployment gives each token a generated card. The first Sepolia
+   * deployment predates that and only ever shows the on-chain artwork.
+   */
+  revealable: boolean;
+  /** Tokens 1..revealedCount already show their card in wallets. */
+  revealedCount: bigint;
+}
+
+export interface ContractState extends RevealState {
   claimOpen: boolean;
   /** When false the contract lets any address claim, and proofs.json is not consulted. */
   allowlistEnabled: boolean;
@@ -29,12 +39,16 @@ export interface ContractState {
 
 export interface OwnedToken {
   tokenId: bigint;
-  /** The `image` field decoded out of the on-chain tokenURI. */
-  image: string;
-  name: string;
   /** Current holder. Not necessarily the claimer: these tokens are transferable. */
   owner: Address;
+  /** Who claimed it, which is what its card is drawn from. Null where not recorded. */
+  claimer: Address | null;
+  /** The on-chain artwork and name, while tokenURI still serves them. */
+  placeholder: {image: string; name: string} | null;
 }
+
+/** ERC-4906 metadata updates. Only the reveal-capable contract advertises it. */
+const ERC4906_INTERFACE = "0x49064906";
 
 /** Typed separately from the ABI so `getLogs` can infer `args.tokenId`. */
 const CLAIMED_EVENT = parseAbiItem(
@@ -60,15 +74,33 @@ export async function readContractState(account: Address): Promise<ContractState
   const address = contractAddress();
   const base = {address, abi: CPSC3640NFT_ABI} as const;
 
-  const [claimOpen, allowlistEnabled, merkleRoot, hasClaimed, totalMinted] = await Promise.all([
+  const [claimOpen, allowlistEnabled, merkleRoot, hasClaimed, totalMinted, reveal] = await Promise.all([
     client.readContract({...base, functionName: "claimOpen"}),
     client.readContract({...base, functionName: "allowlistEnabled"}),
     client.readContract({...base, functionName: "merkleRoot"}),
     client.readContract({...base, functionName: "hasClaimed", args: [account]}),
-    client.readContract({...base, functionName: "totalMinted"})
+    client.readContract({...base, functionName: "totalMinted"}),
+    readRevealState()
   ]);
 
-  return {claimOpen, allowlistEnabled, merkleRoot, hasClaimed, totalMinted};
+  return {claimOpen, allowlistEnabled, merkleRoot, hasClaimed, totalMinted, ...reveal};
+}
+
+/**
+ * Asked through ERC-165 rather than by calling `revealedCount` and treating a revert
+ * as "not supported", which would also swallow a flaky RPC and quietly show the
+ * wrong artwork.
+ */
+export async function readRevealState(): Promise<RevealState> {
+  const client = publicClient();
+  const base = {address: contractAddress(), abi: CPSC3640NFT_ABI} as const;
+  const revealable = await client.readContract({
+    ...base,
+    functionName: "supportsInterface",
+    args: [ERC4906_INTERFACE]
+  });
+  const revealedCount = revealable ? await client.readContract({...base, functionName: "revealedCount"}) : 0n;
+  return {revealable, revealedCount};
 }
 
 /** Ask the contract, not proofs.json, whether this proof actually works. */
@@ -146,26 +178,22 @@ export async function findClaimedTokenId(
 }
 
 /**
- * Read the real on-chain `tokenURI` and decode it.
+ * Read a token as wallets see it.
  *
- * The success screen deliberately renders this rather than the local preview SVG, so
- * what the student sees is what the contract will hand any wallet or marketplace.
+ * Until its card is revealed, tokenURI is an on-chain data URI, decoded here so the
+ * page can show exactly what the contract hands out. Afterwards it points at the
+ * uploaded metadata, and the page draws the card itself instead.
  */
-export async function readToken(tokenId: bigint): Promise<OwnedToken> {
-  const [uri, holder] = await Promise.all([
-    publicClient().readContract({
-      address: contractAddress(),
-      abi: CPSC3640NFT_ABI,
-      functionName: "tokenURI",
-      args: [tokenId]
-    }),
-    ownerOf(tokenId)
+export async function readToken(tokenId: bigint, revealable: boolean): Promise<OwnedToken> {
+  const base = {address: contractAddress(), abi: CPSC3640NFT_ABI} as const;
+  const [uri, holder, claimer] = await Promise.all([
+    publicClient().readContract({...base, functionName: "tokenURI", args: [tokenId]}),
+    ownerOf(tokenId),
+    revealable ? publicClient().readContract({...base, functionName: "claimerOf", args: [tokenId]}) : null
   ]);
 
   const prefix = "data:application/json;base64,";
-  if (!uri.startsWith(prefix)) {
-    throw new Error("tokenURI is not a base64 JSON data URI");
-  }
+  if (!uri.startsWith(prefix)) return {tokenId, owner: holder, claimer, placeholder: null};
 
   const metadata = JSON.parse(atob(uri.slice(prefix.length))) as {
     name?: string;
@@ -176,9 +204,9 @@ export async function readToken(tokenId: bigint): Promise<OwnedToken> {
 
   return {
     tokenId,
-    image: metadata.image,
-    name: metadata.name ?? `Token #${tokenId}`,
-    owner: holder
+    owner: holder,
+    claimer,
+    placeholder: {image: metadata.image, name: metadata.name ?? `Token #${tokenId}`}
   };
 }
 
@@ -193,6 +221,15 @@ export async function readTotalMinted(): Promise<bigint> {
     address: contractAddress(),
     abi: CPSC3640NFT_ABI,
     functionName: "totalMinted"
+  });
+}
+
+/** How many tokens show their card in wallets. Re-read on a timer after claiming. */
+export async function readRevealedCount(): Promise<bigint> {
+  return publicClient().readContract({
+    address: contractAddress(),
+    abi: CPSC3640NFT_ABI,
+    functionName: "revealedCount"
   });
 }
 

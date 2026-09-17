@@ -12,7 +12,7 @@
  * Output: output/rarity-report.json and output/rarity-report.md
  */
 import {mkdirSync, writeFileSync} from "node:fs";
-import {loadConfig} from "../src/config";
+import {loadConfig} from "../src/loadConfig";
 import {allowedDistribution} from "../src/compatibility";
 import {planNFT} from "../src/generator";
 import {fromRoot} from "../src/paths";

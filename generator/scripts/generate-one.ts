@@ -1,37 +1,39 @@
 /**
  * Generate one NFT (spec section 24).
  *
- *   npm run generate -- --token-id 123 --wallet 0xabc... --salt "fall-2026-secret"
+ *   npm run generate -- --token-id 123 --wallet 0xabc...
  *   npm run generate -- --token-id 123 --wallet 0xabc... --badge staff
  *
- * Prefer NFT_SALT in generator/.env over --salt: a salt typed on the command line
- * ends up in shell history.
+ * Uses the collection salt from config/collection.json, the same one the claim page
+ * uses, so the card matches what that student was shown. --salt overrides it for
+ * experiments; the result will then not match the page.
  *
  * Options:
  *   --badge <value>    force a badge, e.g. staff or ta_edition
  *   --base <template>  force a base template
  *   --out <dir>        output directory (default: output/)
  *   --cid <cid>        image CID, if already uploaded
+ *   --salt <salt>      experiment with a different salt
  */
 import {relative} from "node:path";
 import {generateNFT} from "../src/generator";
 import {fromRoot} from "../src/paths";
 import type {ForcedTraits} from "../src/traits";
-import {PUBLIC_PREVIEW_SALT, loadDotEnv, parseArgs, run, stringArg} from "./cli";
+import {loadCollection} from "../src/loadConfig";
+import {parseArgs, run, stringArg} from "./cli";
 
 run(async () => {
-  loadDotEnv();
   const args = parseArgs();
   const tokenId = stringArg(args, "token-id");
   const wallet = stringArg(args, "wallet");
-  const salt = stringArg(args, "salt") ?? process.env.NFT_SALT;
+  const collectionSalt = loadCollection().salt;
+  const salt = stringArg(args, "salt") ?? collectionSalt;
 
   if (!tokenId || !wallet) {
-    throw new Error("usage: npm run generate -- --token-id <id> --wallet <0x...> [--salt <salt>] [--badge <badge>]");
+    throw new Error("usage: npm run generate -- --token-id <id> --wallet <0x...> [--badge <badge>] [--salt <salt>]");
   }
-  if (!salt) throw new Error("No salt. Pass --salt, or set NFT_SALT in generator/.env.");
-  if (salt === PUBLIC_PREVIEW_SALT) {
-    console.warn("warning: this is the public preview salt. Anyone can predict these traits.\n");
+  if (salt !== collectionSalt) {
+    console.warn("note: not the collection salt, so this card will not match the claim page.\n");
   }
 
   const forced: ForcedTraits = {};

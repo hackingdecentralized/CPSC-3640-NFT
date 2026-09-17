@@ -62,8 +62,17 @@ jobs:
       - name: Generate proofs
         run: npm run merkle -- --example
 
+      - name: Export the card layers the page draws with
+        run: |
+          npm --prefix generator ci
+          npm --prefix generator run prepare-assets
+          npm --prefix generator run export-web
+
       - name: Build the claim page
         run: npm --prefix web ci && npm --prefix web run build
+
+      - name: Fail if the build cannot draw cards
+        run: test -f web/dist/nft/index.json
 
   generator:
     name: NFT generator

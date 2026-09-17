@@ -3,11 +3,13 @@
  *
  *   seed = SHA256( normalize(tokenId) || ":" || lowercase(walletAddress) || ":" || salt )
  *
+ * Runs unchanged in Node and in the browser: the hash is src/sha256.ts.
+ *
  * Every trait then draws from its own sub-stream, SHA256(seed || ":" || label), so
  * no trait's draws can shift another's. Forcing a badge, or retuning the background
  * weights, leaves every other trait of an existing token exactly as it was.
  */
-import {createHash} from "node:crypto";
+import {sha256Hex} from "./sha256";
 
 export type TokenIdInput = string | number | bigint;
 
@@ -36,10 +38,6 @@ export function normalizeWallet(walletAddress: string): string {
   return text.toLowerCase();
 }
 
-export function sha256Hex(text: string): string {
-  return createHash("sha256").update(text, "utf8").digest("hex");
-}
-
 export function deriveSeed(tokenId: TokenIdInput, walletAddress: string, salt: string): string {
   if (typeof salt !== "string" || salt.length === 0) throw new Error("salt must be a non-empty string");
   return sha256Hex(`${normalizeTokenId(tokenId)}:${normalizeWallet(walletAddress)}:${salt}`);
@@ -49,3 +47,5 @@ export function deriveSeed(tokenId: TokenIdInput, walletAddress: string, salt: s
 export function subSeed(seed: string, label: string): string {
   return sha256Hex(`${seed}:${label}`);
 }
+
+export {sha256Hex};

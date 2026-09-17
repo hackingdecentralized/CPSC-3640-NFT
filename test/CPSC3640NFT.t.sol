@@ -51,6 +51,9 @@ contract CPSC3640NFTTest is Test {
     event Claimed(address indexed account, uint256 indexed tokenId);
     event MerkleRootUpdated(bytes32 indexed previousRoot, bytes32 indexed newRoot);
     event ClaimOpenUpdated(bool isOpen);
+    event BaseURIUpdated(string baseURI, uint256 revealedCount);
+    event MetadataFrozen(string baseURI);
+    event BatchMetadataUpdate(uint256 _fromTokenId, uint256 _toTokenId);
 
     /// @dev Anvil account #2. Deliberately absent from addresses.example.json.
     address internal constant NOT_ALLOWLISTED = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC;
@@ -208,6 +211,243 @@ contract CPSC3640NFTTest is Test {
         vm.prank(allowlisted[0]);
         vm.expectRevert(CPSC3640NFT.AlreadyClaimed.selector);
         nft.claim(proofs[0]);
+    }
+
+    // -----------------------------------------------------------------------
+    // Reveal
+    // -----------------------------------------------------------------------
+
+    string internal constant CID_URI = "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi/";
+
+    function _claimTwo() internal {
+        vm.prank(allowlisted[0]);
+        nft.claim(proofs[0]);
+        vm.prank(allowlisted[1]);
+        nft.claim(proofs[1]);
+    }
+
+    function test_RecordsWhoClaimedEachToken() public {
+        _claimTwo();
+        assertEq(nft.claimerOf(1), allowlisted[0]);
+        assertEq(nft.claimerOf(2), allowlisted[1]);
+        assertEq(nft.claimerOf(3), address(0), "unminted token has no claimer");
+    }
+
+    function test_ClaimerSurvivesTransfer() public {
+        _claimTwo();
+        address friend = makeAddr("friend");
+        vm.prank(allowlisted[0]);
+        nft.transferFrom(allowlisted[0], friend, 1);
+        assertEq(nft.ownerOf(1), friend);
+        assertEq(nft.claimerOf(1), allowlisted[0], "the card belongs to whoever claimed it");
+    }
+
+    string internal constant NEXT_URI = "ipfs://bafybeihkoviema7g3gxyt6la7vd5ho32ictqbilu3wnlo3rs7ewhnp7lly/";
+
+    function _placeholder(uint256 tokenId) internal view returns (bool) {
+        return _startsWith(nft.tokenURI(tokenId), "data:application/json;base64,");
+    }
+
+    function test_UnrevealedByDefault() public {
+        _claimTwo();
+        assertEq(nft.revealedCount(), 0);
+        assertEq(bytes(nft.baseURI()).length, 0);
+        assertTrue(_placeholder(1), "placeholder stays on-chain");
+    }
+
+    function test_OwnerRevealsTheCollection() public {
+        _claimTwo();
+
+        vm.expectEmit(false, false, false, true);
+        emit BaseURIUpdated(CID_URI, 2);
+        vm.expectEmit(false, false, false, true);
+        emit BatchMetadataUpdate(1, 2);
+        vm.prank(owner);
+        nft.setBaseURI(CID_URI, 2);
+
+        assertEq(nft.revealedCount(), 2);
+        assertEq(nft.tokenURI(1), string.concat(CID_URI, "1.json"));
+        assertEq(nft.tokenURI(2), string.concat(CID_URI, "2.json"));
+    }
+
+    function test_TokensClaimedAfterARevealKeepThePlaceholder() public {
+        _claimTwo();
+        vm.prank(owner);
+        nft.setBaseURI(CID_URI, 2);
+
+        // Not in the uploaded collection, so it must not point into it.
+        vm.prank(allowlisted[2]);
+        nft.claim(proofs[2]);
+        assertTrue(_placeholder(3), "a later token is not in the uploaded directory");
+        assertEq(nft.tokenURI(2), string.concat(CID_URI, "2.json"));
+
+        // The next reveal covers it.
+        vm.prank(owner);
+        nft.setBaseURI(NEXT_URI, 3);
+        assertEq(nft.tokenURI(1), string.concat(NEXT_URI, "1.json"));
+        assertEq(nft.tokenURI(3), string.concat(NEXT_URI, "3.json"));
+    }
+
+    function test_ARevealCanCoverOnlyTheFirstTokens() public {
+        _claimTwo();
+        vm.prank(owner);
+        nft.setBaseURI(CID_URI, 1);
+        assertEq(nft.tokenURI(1), string.concat(CID_URI, "1.json"));
+        assertTrue(_placeholder(2));
+    }
+
+    function test_RejectsARevealThatDoesNotMatchTheMintedTokens() public {
+        vm.startPrank(owner);
+        vm.expectRevert(CPSC3640NFT.InvalidReveal.selector);
+        nft.setBaseURI(CID_URI, 1); // nothing minted yet
+        vm.stopPrank();
+
+        _claimTwo();
+        vm.startPrank(owner);
+        vm.expectRevert(CPSC3640NFT.InvalidReveal.selector);
+        nft.setBaseURI(CID_URI, 3); // token 3 does not exist
+        vm.expectRevert(CPSC3640NFT.InvalidReveal.selector);
+        nft.setBaseURI(CID_URI, 0); // a location that covers nothing
+        vm.expectRevert(CPSC3640NFT.InvalidReveal.selector);
+        nft.setBaseURI("", 2); // tokens with nowhere to point
+        vm.stopPrank();
+        assertEq(nft.revealedCount(), 0);
+    }
+
+    function testFuzz_TokenURIFollowsRevealedCount(uint8 mintedSeed, uint8 countSeed) public {
+        uint256 minted = bound(mintedSeed, 1, 8);
+        uint256 count = bound(countSeed, 1, minted);
+        vm.prank(owner);
+        nft.setAllowlistEnabled(false);
+        for (uint256 i = 0; i < minted; i++) {
+            vm.prank(makeAddr(string.concat("student", vm.toString(i))));
+            nft.claim(new bytes32[](0));
+        }
+
+        vm.prank(owner);
+        nft.setBaseURI(CID_URI, count);
+        for (uint256 id = 1; id <= minted; id++) {
+            if (id <= count) assertEq(nft.tokenURI(id), string.concat(CID_URI, vm.toString(id), ".json"));
+            else assertTrue(_placeholder(id));
+        }
+    }
+
+    function test_RevealCanBeUndoneUntilFrozen() public {
+        _claimTwo();
+        vm.startPrank(owner);
+        nft.setBaseURI(CID_URI, 2);
+        nft.setBaseURI("", 0);
+        vm.stopPrank();
+        assertEq(nft.revealedCount(), 0);
+        assertTrue(_placeholder(1));
+    }
+
+    function test_UndoingWithNothingMintedEmitsNoBatchUpdate() public {
+        vm.recordLogs();
+        vm.prank(owner);
+        nft.setBaseURI("", 0);
+        assertEq(vm.getRecordedLogs().length, 1, "only BaseURIUpdated; there is no token range to refresh");
+    }
+
+    function test_NonOwnerCannotReveal() public {
+        _claimTwo();
+        address stranger = makeAddr("stranger");
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, stranger));
+        nft.setBaseURI("ipfs://hostile/", 1);
+    }
+
+    function test_FreezeMakesTheLocationPermanent() public {
+        _claimTwo();
+        vm.startPrank(owner);
+        nft.setBaseURI(CID_URI, 2);
+
+        vm.expectEmit(false, false, false, true);
+        emit MetadataFrozen(CID_URI);
+        nft.freezeMetadata();
+        assertTrue(nft.metadataFrozen());
+
+        vm.expectRevert(CPSC3640NFT.MetadataIsFrozen.selector);
+        nft.setBaseURI(NEXT_URI, 2);
+        vm.expectRevert(CPSC3640NFT.MetadataIsFrozen.selector);
+        nft.setBaseURI("", 0);
+        vm.stopPrank();
+
+        assertEq(nft.tokenURI(2), string.concat(CID_URI, "2.json"));
+    }
+
+    function test_FreezingClosesTheCollectionForGood() public {
+        _claimTwo();
+        vm.startPrank(owner);
+        nft.setBaseURI(CID_URI, 2);
+        nft.freezeMetadata();
+        assertFalse(nft.claimOpen(), "freezing ends claiming");
+
+        vm.expectRevert(CPSC3640NFT.MetadataIsFrozen.selector);
+        nft.setClaimOpen(true);
+        nft.setClaimOpen(false); // closing again is harmless
+        vm.stopPrank();
+
+        vm.prank(allowlisted[2]);
+        vm.expectRevert(CPSC3640NFT.ClaimClosed.selector);
+        nft.claim(proofs[2]);
+        assertEq(nft.totalMinted(), 2);
+    }
+
+    function test_CannotFreezeBeforeReveal() public {
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(CPSC3640NFT.RevealIncomplete.selector, 0, 0));
+        nft.freezeMetadata();
+    }
+
+    function test_CannotFreezeWhileATokenIsUnrevealed() public {
+        _claimTwo();
+        vm.prank(owner);
+        nft.setBaseURI(CID_URI, 1);
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(CPSC3640NFT.RevealIncomplete.selector, 1, 2));
+        nft.freezeMetadata();
+    }
+
+    function test_AClaimBetweenRevealAndFreezeBlocksTheFreeze() public {
+        _claimTwo();
+        vm.prank(owner);
+        nft.setBaseURI(CID_URI, 2);
+
+        vm.prank(allowlisted[2]);
+        nft.claim(proofs[2]);
+
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(CPSC3640NFT.RevealIncomplete.selector, 2, 3));
+        nft.freezeMetadata();
+        assertFalse(nft.metadataFrozen());
+        assertTrue(nft.claimOpen());
+    }
+
+    function test_NonOwnerCannotFreeze() public {
+        _claimTwo();
+        vm.prank(owner);
+        nft.setBaseURI(CID_URI, 2);
+        address stranger = makeAddr("stranger");
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, stranger));
+        nft.freezeMetadata();
+    }
+
+    function test_NonexistentTokenStillRevertsAfterReveal() public {
+        _claimTwo();
+        vm.prank(owner);
+        nft.setBaseURI(CID_URI, 2);
+        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, 9));
+        nft.tokenURI(9);
+    }
+
+    function test_AdvertisesMetadataUpdatesAndERC721() public view {
+        assertTrue(nft.supportsInterface(0x49064906), "ERC-4906");
+        assertTrue(nft.supportsInterface(0x80ac58cd), "ERC-721");
+        assertTrue(nft.supportsInterface(0x5b5e139f), "ERC-721 metadata");
+        assertTrue(nft.supportsInterface(0x01ffc9a7), "ERC-165");
+        assertFalse(nft.supportsInterface(0xdeadbeef));
     }
 
     // -----------------------------------------------------------------------
