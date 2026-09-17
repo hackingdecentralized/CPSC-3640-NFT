@@ -455,10 +455,6 @@ function designsFigure(): string {
     : '<figure aria-hidden="true"><div class="tile"></div><figcaption>&nbsp;<span>&nbsp;</span></figcaption></figure>'.repeat(6);
   return `<figure class="card art">
     <div class="designs">${tiles}</div>
-    <figcaption>
-      Six designs, each card with its own background, border, halo, icons and badge.
-      Yours is drawn from your wallet and claim number when you claim.
-    </figcaption>
   </figure>`;
 }
 
