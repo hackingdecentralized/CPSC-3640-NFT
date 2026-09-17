@@ -15,6 +15,11 @@ const HOLD_AFTER_INTERACTION_MS = 10_000;
 /** The slide on show. Kept here so a re-render does not jump back to the first. */
 let current = 0;
 let heldUntil = 0;
+/**
+ * While a scroll this module started is still moving, the positions it passes
+ * through, including the one it starts from, are not the visitor's choice.
+ */
+let steeringUntil = 0;
 let hovering = false;
 let timer: number | undefined;
 let resizeBound = false;
@@ -87,7 +92,9 @@ function go(host: ParentNode, to: number, smooth: boolean): void {
   if (!found) return;
   const {slides, figures} = found;
   current = ((to % figures.length) + figures.length) % figures.length;
-  slides.scrollTo({left: current * slides.clientWidth, behavior: smooth && !reducedMotion() ? "smooth" : "instant"});
+  const animate = smooth && !reducedMotion();
+  steeringUntil = Date.now() + (animate ? 2000 : 300);
+  slides.scrollTo({left: current * slides.clientWidth, behavior: animate ? "smooth" : "instant"});
   reflect(host);
 }
 
@@ -106,18 +113,28 @@ export function mountSlideshow(host: HTMLElement): void {
       const width = slides.clientWidth;
       if (width === 0) return;
       const at = Math.round(slides.scrollLeft / width);
-      // Only a slide that has come to rest counts. A smooth scroll passing over
-      // slides on its way back to the first must not flicker the caption.
+      // Only a slide that has come to rest counts.
       const resting = Math.abs(slides.scrollLeft - at * width) < 2;
+      if (Date.now() < steeringUntil) {
+        if (resting && at === current) steeringUntil = 0;
+        return;
+      }
       if (resting && at !== current && at >= 0 && at < figures.length) {
         current = at;
         reflect(host);
       }
     });
   });
-  // A swipe or a drag is someone choosing; let them look.
+  // A swipe or a drag is someone choosing: follow them, and let them look.
   for (const kind of ["pointerdown", "wheel", "touchstart"]) {
-    slides.addEventListener(kind, () => (heldUntil = Date.now() + HOLD_AFTER_INTERACTION_MS), {passive: true});
+    slides.addEventListener(
+      kind,
+      () => {
+        steeringUntil = 0;
+        heldUntil = Date.now() + HOLD_AFTER_INTERACTION_MS;
+      },
+      {passive: true}
+    );
   }
   slides.addEventListener("keydown", (event) => {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;

@@ -98,8 +98,14 @@ body {
 .slide-nav:hover:not(:disabled) { border-color: var(--amber); }
 .slide-nav.prev { left: 10px; }
 .slide-nav.next { right: 10px; }
-.slide-caption { margin: 12px 0 0; text-align: center; font-size: 15px; }
-.slide-caption span { margin-left: 6px; color: var(--muted); font-size: 13px; }
+.slide-caption {
+  margin: 12px 0 0; font-size: 15px; line-height: 1.45; text-align: center;
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center; column-gap: 6px;
+}
+.slide-caption span { color: var(--muted); font-size: 13px; }
+/* A long name pushes the share onto a second line on a phone. Keep room for it, so
+   the page does not jump each time that design slides in. */
+@media (max-width: 560px) { .slide-caption { min-height: 2.9em; } }
 .slide-dots { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
 .slide-dots button {
   width: 8px; height: 8px; padding: 0; border-radius: 4px; background: var(--line);
