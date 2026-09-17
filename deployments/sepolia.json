@@ -1,20 +1,20 @@
 {
   "network": "sepolia",
   "chainId": 11155111,
-  "contractAddress": "0x91e67ce5959ae94d898ed3c3add09d93dfb7f6bf",
-  "deploymentBlock": 11678558,
-  "transactionHash": "0xb04fbe84b7cb53a4f547c82106e6cfe96f9b79225dcdb971f44ab72b4f10135b",
+  "contractAddress": "0x6217a848eed68ad8e33bee3e7f55edff7f28ab6a",
+  "deploymentBlock": 11721212,
+  "transactionHash": "0x217c3abdd382bbe8b65d597f2f41137426cd451cb707fc0a76c5d5fc80545473",
   "deployer": "0x6376b9b4ea797e48e0dc9349b2413d47d19d298e",
   "owner": "0x6376B9B4ea797E48e0dc9349B2413d47D19d298E",
   "merkleRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
   "claimOpen": true,
   "allowlistEnabled": false,
-  "revealable": false,
+  "revealable": true,
   "constructorArgs": [
     "0x6376B9B4ea797E48e0dc9349B2413d47D19d298E",
     "0x0000000000000000000000000000000000000000000000000000000000000000",
     "true",
     "false"
   ],
-  "deployedAt": "2026-09-11T01:00:39.362Z"
+  "deployedAt": "2026-09-17T03:50:40.068Z"
 }
