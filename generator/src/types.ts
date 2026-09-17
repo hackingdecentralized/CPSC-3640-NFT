@@ -70,7 +70,10 @@ export interface Slot {
 }
 
 export interface Layout {
+  /** The design space every coordinate is written in. Always 2048. */
   canvas: number;
+  /** Width and height of the rendered PNG. Coordinates are scaled to it. */
+  outputSize: number;
   sourceSize: number;
   border: {outer: RoundRect; inner: RoundRect};
   protected: Record<string, Rect>;

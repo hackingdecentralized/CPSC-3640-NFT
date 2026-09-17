@@ -2,6 +2,7 @@ import {existsSync} from "node:fs";
 import sharp from "sharp";
 import {beforeAll, describe, expect, it} from "vitest";
 import {maskPath} from "../src/assets";
+import {outputScale, scaleOuter} from "../src/config";
 import {fromRoot} from "../src/paths";
 import {renderImage} from "../src/renderer";
 import {deriveSeed} from "../src/seed";
@@ -44,18 +45,22 @@ describe.skipIf(skip)("rendering", () => {
     }
   }, 120_000);
 
-  it("produces 2048x2048 PNGs", async () => {
+  it("produces square PNGs at the configured output size", async () => {
+    const size = config.layout.outputSize;
     for (const image of renders.values()) {
       const meta = await sharp(image).metadata();
-      expect([meta.format, meta.width, meta.height]).toEqual(["png", 2048, 2048]);
+      expect([meta.format, meta.width, meta.height]).toEqual(["png", size, size]);
     }
   });
 
   it.each(Object.keys(BUSY))("never changes a single pixel of course text on %s", async (template) => {
     const rendered = await raw(renders.get(template)!);
     const base = await raw(fromRoot(config.baseTemplates[template]!.asset));
-    const size = config.layout.canvas;
-    for (const [region, r] of Object.entries(config.layout.protected)) {
+    const size = config.layout.outputSize;
+    const scale = outputScale(config.layout);
+    for (const [region, area] of Object.entries(config.layout.protected)) {
+      // Every output pixel the protected box touches, not just the ones inside it.
+      const r = scaleOuter(area, scale);
       let changed = 0;
       for (let y = r.y; y < r.y + r.h; y++) {
         for (let x = r.x; x < r.x + r.w; x++) {
@@ -78,7 +83,7 @@ describe.skipIf(skip)("rendering", () => {
     const base = await raw(fromRoot(config.baseTemplates.tower_clock!.asset));
     let changed = 0;
     for (let i = 0; i < rendered.data.length; i++) if (rendered.data[i] !== base.data[i]) changed++;
-    expect(changed).toBeGreaterThan(100_000);
+    expect(changed).toBeGreaterThan(config.layout.outputSize ** 2 / 20);
   });
 
   it("renders byte-identical output for the same inputs", async () => {

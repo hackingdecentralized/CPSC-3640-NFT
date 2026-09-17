@@ -182,6 +182,27 @@ export const slotRect = (slot: Slot): Rect => ({
   h: slot.h
 });
 
+/** Output pixels per design-space pixel. */
+export const outputScale = (layout: Layout): number => layout.outputSize / layout.canvas;
+
+/** The integer output rectangle covering every pixel `r` touches. For things that must stay clear. */
+export function scaleOuter(r: Rect, scale: number): Rect {
+  const x0 = Math.floor(r.x * scale);
+  const y0 = Math.floor(r.y * scale);
+  return {x: x0, y: y0, w: Math.ceil((r.x + r.w) * scale) - x0, h: Math.ceil((r.y + r.h) * scale) - y0};
+}
+
+/** Where a slot's image is placed in the output. */
+export function scaleSlot(slot: Slot, scale: number): Rect {
+  const r = slotRect(slot);
+  return {
+    x: Math.round(r.x * scale),
+    y: Math.round(r.y * scale),
+    w: Math.max(1, Math.round(r.w * scale)),
+    h: Math.max(1, Math.round(r.h * scale))
+  };
+}
+
 export const intersects = (a: Rect, b: Rect): boolean =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
@@ -204,6 +225,9 @@ export function allSlots(layout: Layout): Array<[string, Slot]> {
 function validateLayout(layout: Layout, maxIcons: number): string[] {
   const problems: string[] = [];
   if (layout.canvas !== 2048) problems.push(`layout.canvas must be 2048, got ${layout.canvas}`);
+  if (!Number.isInteger(layout.outputSize) || layout.outputSize < 64 || layout.outputSize > layout.canvas) {
+    problems.push(`layout.outputSize must be a whole number from 64 to ${layout.canvas}, got ${layout.outputSize}`);
+  }
 
   const microSlots = Object.keys(layout.slots.micro);
   if (microSlots.length < maxIcons) {
@@ -226,6 +250,27 @@ function validateLayout(layout: Layout, maxIcons: number): string[] {
     for (let j = i + 1; j < slots.length; j++) {
       if (intersects(slotRect(slots[i]![1]), slotRect(slots[j]![1]))) {
         problems.push(`slots ${slots[i]![0]} and ${slots[j]![0]} overlap`);
+      }
+    }
+  }
+
+  // Rounding to the output size can close a gap that exists in design space, so
+  // check again at the size that is actually rendered.
+  if (Number.isInteger(layout.outputSize) && layout.outputSize >= 64 && layout.outputSize < layout.canvas) {
+    const scale = outputScale(layout);
+    const placed = slots.map(([name, slot]) => [name, scaleSlot(slot, scale)] as const);
+    for (const [name, rect] of placed) {
+      for (const [region, area] of Object.entries(layout.protected)) {
+        if (intersects(rect, scaleOuter(area, scale))) {
+          problems.push(`slot ${name} overlaps protected region "${region}" at ${layout.outputSize}px`);
+        }
+      }
+    }
+    for (let i = 0; i < placed.length; i++) {
+      for (let j = i + 1; j < placed.length; j++) {
+        if (intersects(placed[i]![1], placed[j]![1])) {
+          problems.push(`slots ${placed[i]![0]} and ${placed[j]![0]} overlap at ${layout.outputSize}px`);
+        }
       }
     }
   }

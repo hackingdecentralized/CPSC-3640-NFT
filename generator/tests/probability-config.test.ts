@@ -147,6 +147,30 @@ describe("configuration validation rejects", () => {
     expect(overlapping.join()).toMatch(/overlap/);
   });
 
+  it("an output size that is not a whole number in range", () => {
+    for (const bad of [0, 63, 2049, 1000.5]) {
+      expect(problemsFor((c) => (c.layout.outputSize = bad)).join()).toMatch(/outputSize must be a whole number/);
+    }
+    expect(problemsFor((c) => (c.layout.outputSize = 2048))).toEqual([]);
+  });
+
+  it("a slot that only collides with text once scaled to the output size", () => {
+    // 1px clear of the footer in design space. Rounded to 1024px, it lands on it.
+    const mutate = (c: ReturnType<typeof cloneConfig>) => {
+      c.layout.slots.role.contract_icon = {cx: 1024, cy: 1665, w: 80, h: 80};
+    };
+    const atFull = problemsFor((c) => {
+      mutate(c);
+      c.layout.outputSize = 2048;
+    });
+    expect(atFull).toEqual([]);
+    const atHalf = problemsFor((c) => {
+      mutate(c);
+      c.layout.outputSize = 1024;
+    });
+    expect(atHalf.join()).toMatch(/role\.contract_icon overlaps protected region "footer" at 1024px/);
+  });
+
   it("a preferred multiplier out of range", () => {
     expect(problemsFor((c) => (c.compatibility.preferredMultiplier = 0)).join()).toMatch(/preferredMultiplier/);
     expect(problemsFor((c) => (c.compatibility.preferredMultiplier = 1000)).join()).toMatch(/preferredMultiplier/);

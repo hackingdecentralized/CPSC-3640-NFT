@@ -64,7 +64,7 @@ run(async () => {
         `<div class="body"><h3>${escapeHtml(t.label)}</h3><div class="muted mono">${id} &middot; weight ${t.weight}%</div></div></article>`
     );
     const alpha = await sharp(fromRoot(maskPath(id))).extractChannel(3).toBuffer();
-    const tint = await sharp({create: {width: layout.canvas, height: layout.canvas, channels: 3, background: "#3ddc84"}})
+    const tint = await sharp({create: {width: layout.outputSize, height: layout.outputSize, channels: 3, background: "#3ddc84"}})
       .joinChannel(alpha)
       .png()
       .toBuffer();

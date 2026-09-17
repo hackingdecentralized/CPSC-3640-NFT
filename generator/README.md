@@ -14,7 +14,7 @@ needs no IPFS account to render.
 ```bash
 cd generator
 npm ci
-npm run prepare-assets     # build the 2048px bases and masks (about 10 s)
+npm run prepare-assets     # build the 1024px bases and masks (about 5 s)
 npm test                   # 70 tests, including pixel checks on real renders
 npm run preview -- --count 20
 open output/preview/index.html
@@ -32,7 +32,7 @@ tokenId, walletAddress, salt
         |
         v  base + background + border + halo + micro icons + role icons + badge + egg
         |
-        v  output/images/<id>.png        2048 x 2048
+        v  output/images/<id>.png        1024 x 1024 RGB
            output/metadata/<id>.json     ERC-721 metadata
 ```
 
@@ -124,7 +124,7 @@ regions in `layout.json`. Three things keep them intact:
 
 | Command | Does |
 | --- | --- |
-| `npm run prepare-assets` | resize templates to 2048px and build masks; add `--force` to rebuild, `--debug` for mask images |
+| `npm run prepare-assets` | resize templates to the output size and build masks; add `--force` to rebuild, `--debug` for mask images |
 | `npm run build-overlays` | regenerate every overlay SVG from `scripts/build-overlays.ts` |
 | `npm run validate-assets` | check sources are unchanged, prepared assets are current, masks protect the text, and every overlay exists at the right size |
 | `npm run asset-sheet` | `output/asset-sheet/index.html`: regions, masks, showcase renders, every overlay |
@@ -188,9 +188,28 @@ pin.
 Five templates are exactly the files supplied. `bulldog_special` is the bulldog card
 already used by this project, extracted unchanged from `nft/course-nft.svg`.
 
-All sources are 1254px, so the 2048px output is an upscale: overlays are sharp, the base
-art is as sharp as its source. Supply larger sources and nothing else needs to change.
-
 Badge labels use a small stroke font drawn as paths (`src/strokeFont.ts`), not SVG
 text. Text would render with whatever fonts the machine has, and two machines would
 produce different images.
+
+## Output size
+
+Tokens are **1024 x 1024 RGB PNGs**, about 1.3 MB each. That departs from the spec's
+2048 x 2048 on purpose: the supplied templates are 1254px, so 2048 only invented pixels
+and tripled file sizes.
+
+Two sizes are involved, and they are separate settings in `layout.json`:
+
+- `canvas: 2048` is the **design space**. Every coordinate and every overlay SVG is
+  written in it, and the matte is tuned in it. It never changes.
+- `outputSize: 1024` is what gets **rendered**. Everything is rasterised natively at
+  this size. The base is resampled once, straight from the source; the SVGs are
+  vector, so nothing is drawn large and shrunk.
+
+Rendering at 2048 and then shrinking was measured and rejected: it differs from a
+single resample by up to 83 levels at edges (PSNR 33 dB).
+
+To change the size, edit `outputSize` (any whole number from 64 to 2048) and run
+`npm run prepare-assets`; stale assets are detected automatically. Validation re-checks
+every slot at the new size, because rounding can close a gap that exists in design
+space.

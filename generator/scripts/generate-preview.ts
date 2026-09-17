@@ -68,7 +68,7 @@ run(async () => {
       `CPSC 3640/5400 NFT preview (${count})`,
       `<h1>Course NFT preview</h1>` +
         `<p class="lede">${count} deterministic previews: token ids 1&ndash;${count}, Anvil test wallets, public preview salt ` +
-        `<code>${escapeHtml(PUBLIC_PREVIEW_SALT)}</code>. Click an image for the full 2048&times;2048 PNG. Gold pills are rare values.</p>` +
+        `<code>${escapeHtml(PUBLIC_PREVIEW_SALT)}</code>. Click an image for the full ${config.layout.outputSize}&times;${config.layout.outputSize} PNG. Gold pills are rare values.</p>` +
         `<div>${summary}</div><h2>Tokens</h2><div class="grid">${cards}</div>`
     )
   );

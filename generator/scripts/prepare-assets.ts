@@ -3,8 +3,9 @@
  *
  * For each base template:
  *   1. check the supplied source is byte-for-byte what base-templates.json records
- *   2. resize it to the canonical 2048x2048
- *   3. build a "decorable" mask: where background and halo layers may paint. That is
+ *   2. resize it once, straight to layout.outputSize
+ *   3. build a "decorable" mask in the 2048px design space, then scale it to the
+ *      output size: where background and halo layers may paint. That is
  *      inside the border, outside every protected text region, and outside the
  *      illustration itself, so those layers read as sitting behind the artwork.
  *
@@ -18,7 +19,7 @@ import {createHash} from "node:crypto";
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from "node:fs";
 import {dirname} from "node:path";
 import sharp from "sharp";
-import {loadConfig} from "../src/config";
+import {loadConfig, outputScale, scaleOuter} from "../src/config";
 import {fromRoot} from "../src/paths";
 import {close, dilate, fillHoles} from "../src/morphology";
 import {MASK_DIR, PREPARED_MANIFEST, maskPath, matteInfoPath, type MatteInfo} from "../src/assets";
@@ -74,11 +75,41 @@ async function blurred(mask: Uint8Array, size: number, sigma: number): Promise<B
   return out;
 }
 
+/**
+ * The design-space mask at the output size. Resampling blurs the forced zeros at the
+ * edge of each text box, so they are forced again over every output pixel a text box
+ * touches.
+ */
+async function outputMask(config: GeneratorConfig, alpha: Buffer): Promise<Buffer> {
+  const {canvas, outputSize} = config.layout;
+  let scaled: Buffer = alpha;
+  if (outputSize !== canvas) {
+    // The one-channel quirk again: sharp hands back sRGB, so take a single band.
+    scaled = await sharp(alpha, {raw: {width: canvas, height: canvas, channels: 1}})
+      .resize(outputSize, outputSize, {kernel: "mitchell"})
+      .extractChannel(0)
+      .raw()
+      .toBuffer();
+    if (scaled.length !== outputSize * outputSize) {
+      throw new Error(`scaled mask has ${scaled.length} bytes, expected ${outputSize * outputSize}`);
+    }
+  }
+  const scale = outputScale(config.layout);
+  for (const area of Object.values(config.layout.protected)) {
+    const r = scaleOuter(area, scale);
+    for (let y = r.y; y < r.y + r.h; y++) scaled.fill(0, y * outputSize + r.x, y * outputSize + r.x + r.w);
+  }
+  return sharp({create: {width: outputSize, height: outputSize, channels: 3, background: "#ffffff"}})
+    .joinChannel(scaled, {raw: {width: outputSize, height: outputSize, channels: 1}})
+    .png(PNG_OPTIONS)
+    .toBuffer();
+}
+
 async function buildMask(
   config: GeneratorConfig,
   template: string,
   rgb: Buffer
-): Promise<{mask: Buffer; art: Uint8Array; info: MatteInfo}> {
+): Promise<{alpha: Buffer; art: Uint8Array; info: MatteInfo}> {
   const size = config.layout.canvas;
   const box: Rect = config.layout.centralArt;
 
@@ -142,13 +173,8 @@ async function buildMask(
     }
   }
 
-  const mask = await sharp({create: {width: size, height: size, channels: 3, background: "#ffffff"}})
-    .joinChannel(alpha, {raw: {width: size, height: size, channels: 1}})
-    .png(PNG_OPTIONS)
-    .toBuffer();
-
   return {
-    mask,
+    alpha,
     art: solid,
     info: {
       template,
@@ -160,8 +186,7 @@ async function buildMask(
 }
 
 /** Artwork in red, decorable area in green, over a dimmed copy of the base. */
-async function debugImage(base: Buffer, art: Uint8Array, mask: Buffer, size: number): Promise<Buffer> {
-  const alpha = await sharp(mask).extractChannel(3).raw().toBuffer();
+async function debugImage(base: Buffer, art: Uint8Array, alpha: Buffer, size: number): Promise<Buffer> {
   const tint = Buffer.alloc(size * size * 4);
   for (let i = 0; i < size * size; i++) {
     if (art[i]) tint.set([255, 40, 40, 150], i * 4);
@@ -207,23 +232,26 @@ async function main() {
     }
 
     const started = Date.now();
-    const base = await sharp(sourcePath)
-      .removeAlpha()
-      .resize(size, size, {kernel: "lanczos3", fit: "fill"})
-      .png(PNG_OPTIONS)
-      .toBuffer();
-    writeFile(template.asset, base);
+    const resized = (px: number) =>
+      sharp(sourcePath).removeAlpha().resize(px, px, {kernel: "lanczos3", fit: "fill"});
 
-    const rgb = await sharp(base).removeAlpha().raw().toBuffer();
-    const {mask, art, info} = await buildMask(config, id, rgb);
-    writeFile(maskPath(id), mask);
+    // The saved base is resampled once, straight from the source to the output
+    // size. Going through the design size first measurably softens edges.
+    const {outputSize} = config.layout;
+    writeFile(template.asset, await resized(outputSize).png(PNG_OPTIONS).toBuffer());
+
+    // The matte is found in the design space, where its tuning is defined.
+    const design = await resized(size).png().toBuffer();
+    const rgb = await sharp(design).removeAlpha().raw().toBuffer();
+    const {alpha, art, info} = await buildMask(config, id, rgb);
+    writeFile(maskPath(id), await outputMask(config, alpha));
     writeFile(matteInfoPath(id), JSON.stringify(info, null, 2) + "\n");
 
-    if (DEBUG) writeFile(`output/asset-sheet/masks/${id}.png`, await debugImage(base, art, mask, size));
+    if (DEBUG) writeFile(`output/asset-sheet/masks/${id}.png`, await debugImage(design, art, alpha, size));
 
     (manifest.templates as Record<string, string>)[id] = actual;
     console.log(
-      `  ${id.padEnd(16)} ${size}px, art ${info.art.w}x${info.art.h} at (${info.art.x},${info.art.y}), ` +
+      `  ${id.padEnd(16)} ${outputSize}px, art ${info.art.w}x${info.art.h} at (${info.art.x},${info.art.y}) in design space, ` +
         `decorable ${(info.decorableFraction * 100).toFixed(1)}%  (${Date.now() - started} ms)`
     );
   }

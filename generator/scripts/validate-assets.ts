@@ -2,7 +2,7 @@
  * Check every asset the renderer can reach, before anything is generated.
  *
  *   - supplied templates are byte-for-byte unchanged
- *   - prepared bases and masks exist, are 2048x2048, and are not stale
+ *   - prepared bases and masks exist, are outputSize square, and are not stale
  *   - every mask is exactly zero over the protected text and outside the border
  *   - every overlay the configuration can select exists, renders, and has the
  *     right dimensions for its slot
@@ -13,7 +13,7 @@ import {createHash} from "node:crypto";
 import {existsSync, readdirSync, readFileSync} from "node:fs";
 import {join, relative} from "node:path";
 import sharp from "sharp";
-import {loadConfig} from "../src/config";
+import {loadConfig, outputScale, scaleOuter} from "../src/config";
 import {fromRoot} from "../src/paths";
 import {PREPARED_MANIFEST, maskPath, overlayPath} from "../src/assets";
 import {NO_LAYER, ROLE_GROUPS, type RoleGroup} from "../src/types";
@@ -23,7 +23,8 @@ import {run} from "./cli";
 run(async () => {
   const config = loadConfig();
   const {layout} = config;
-  const size = layout.canvas;
+  const size = layout.outputSize;
+  const scale = outputScale(layout);
   const problems: string[] = [];
   const warnings: string[] = [];
   let checked = 0;
@@ -54,7 +55,7 @@ run(async () => {
     }
   }
 
-  const protectedRects = Object.values(layout.protected);
+  const protectedRects = Object.values(layout.protected).map((r) => scaleOuter(r, scale));
   for (const [id, t] of Object.entries(config.baseTemplates)) {
     if (exists(t.asset)) {
       const meta = await sharp(fromRoot(t.asset)).metadata();
@@ -73,10 +74,10 @@ run(async () => {
       }
     }
     if (leaks > 0) problems.push(`${maskPath(id)} lets decoration through ${leaks} pixel(s) of protected text`);
-    const outer = layout.border.outer;
+    const outerTop = Math.floor(layout.border.outer.y * scale) - 1;
     let outside = 0;
     for (let i = 0; i < size; i++) {
-      for (const [x, y] of [[i, 0], [i, size - 1], [0, i], [size - 1, i], [i, outer.y - 1]] as const) {
+      for (const [x, y] of [[i, 0], [i, size - 1], [0, i], [size - 1, i], [i, outerTop]] as const) {
         if (data[y * size + x] !== 0) outside++;
       }
     }
@@ -105,9 +106,11 @@ run(async () => {
   const values = (group: keyof typeof config.traits) => Object.keys(config.traits[group]);
   const drawn = (key: keyof typeof NO_LAYER, value: string) => NO_LAYER[key] !== value;
 
-  for (const v of values("background_style")) await want(overlayPath.background(v), size, size);
-  for (const v of values("border_style")) if (drawn("border_style", v)) await want(overlayPath.border(v), size, size);
-  for (const v of values("halo")) if (drawn("halo", v)) await want(overlayPath.halo(v), size, size);
+  // Overlays are authored in the design space, whatever size is rendered.
+  const design = layout.canvas;
+  for (const v of values("background_style")) await want(overlayPath.background(v), design, design);
+  for (const v of values("border_style")) if (drawn("border_style", v)) await want(overlayPath.border(v), design, design);
+  for (const v of values("halo")) if (drawn("halo", v)) await want(overlayPath.halo(v), design, design);
   const micro = Object.values(layout.slots.micro)[0]!;
   for (const v of values("micro_icons")) await want(overlayPath.micro(v), micro.w, micro.h);
   for (const group of ROLE_GROUPS as readonly RoleGroup[]) {

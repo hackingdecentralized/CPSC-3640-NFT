@@ -1,6 +1,7 @@
 {
-  "$comment": "Every coordinate the renderer uses, in the canonical 2048x2048 space. Measured from the supplied templates at 1254px and scaled by 2048/1254. 'protected' regions hold the fixed course text: no decorative layer may draw there, and tests fail if any slot overlaps one.",
+  "$comment": "Every coordinate the renderer uses, in a fixed 2048x2048 design space: 'canvas'. Measured from the supplied templates at 1254px and scaled by 2048/1254. Images are rendered natively at 'outputSize', with every coordinate scaled to match. 'protected' regions hold the fixed course text: no decorative layer may draw there, and validation fails if any slot overlaps one at either size.",
   "canvas": 2048,
+  "outputSize": 1024,
   "sourceSize": 1254,
   "border": {
     "outer": {

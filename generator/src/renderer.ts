@@ -13,13 +13,18 @@
  * "Masked" means clipped by the template's decorable mask, so those layers never
  * touch the course text or the illustration. Every other layer sits in a slot that
  * configuration validation has already proven clear of the text.
+ *
+ * Coordinates are written in the 2048px design space. Everything is rasterised
+ * directly at layout.outputSize: SVGs are vector, so nothing is drawn large and
+ * then shrunk.
  */
 import {existsSync, readFileSync} from "node:fs";
 import sharp, {type OverlayOptions} from "sharp";
 import {fromRoot} from "./paths";
 import {maskPath, overlayPath} from "./assets";
 import {drawsLayer} from "./compatibility";
-import {ROLE_GROUPS, type GeneratorConfig, type Slot} from "./types";
+import {outputScale, scaleSlot} from "./config";
+import {ROLE_GROUPS, type GeneratorConfig, type Layout, type Slot} from "./types";
 import type {Plan} from "./traits";
 
 export const PNG_OPTIONS = {compressionLevel: 9, adaptiveFiltering: false, palette: false} as const;
@@ -46,12 +51,23 @@ const intrinsicWidth = (svgPath: string): number => {
   return Number(match[1]);
 };
 
-/** A full-canvas SVG layer, clipped to where decoration is allowed on this template. */
-function maskedLayer(svgRelative: string, template: string): Promise<Buffer> {
-  return cached(`masked:${svgRelative}:${template}`, async () => {
+/** A full-canvas SVG rasterised at the output size. */
+function canvasLayer(svgRelative: string, layout: Layout): Promise<Buffer> {
+  const size = layout.outputSize;
+  return cached(`canvas:${svgRelative}:${size}`, async () => {
     const svg = requireFile(svgRelative, "Run `npm run build-overlays`.");
+    return sharp(svg, {density: (72 * size) / intrinsicWidth(svg)})
+      .resize(size, size, {fit: "fill"})
+      .png()
+      .toBuffer();
+  });
+}
+
+/** A full-canvas layer, clipped to where decoration is allowed on this template. */
+function maskedLayer(svgRelative: string, template: string, layout: Layout): Promise<Buffer> {
+  return cached(`masked:${svgRelative}:${template}:${layout.outputSize}`, async () => {
     const mask = requireFile(maskPath(template), "Run `npm run prepare-assets`.");
-    return sharp(svg)
+    return sharp(await canvasLayer(svgRelative, layout))
       .ensureAlpha()
       .composite([{input: mask, blend: "dest-in"}])
       .png()
@@ -59,26 +75,17 @@ function maskedLayer(svgRelative: string, template: string): Promise<Buffer> {
   });
 }
 
-function fullLayer(svgRelative: string): Promise<Buffer> {
-  return cached(`full:${svgRelative}`, async () =>
-    sharp(requireFile(svgRelative, "Run `npm run build-overlays`.")).png().toBuffer()
-  );
-}
-
-/** An SVG rasterised at exactly the slot's size, and where it goes. */
-async function slotLayer(svgRelative: string, slot: Slot): Promise<OverlayOptions> {
-  const input = await cached(`slot:${svgRelative}:${slot.w}x${slot.h}`, async () => {
+/** An SVG rasterised at exactly its slot's output size, and where it goes. */
+async function slotLayer(svgRelative: string, slot: Slot, layout: Layout): Promise<OverlayOptions> {
+  const rect = scaleSlot(slot, outputScale(layout));
+  const input = await cached(`slot:${svgRelative}:${rect.w}x${rect.h}`, async () => {
     const svg = requireFile(svgRelative, "Run `npm run build-overlays`.");
-    return sharp(svg, {density: (72 * slot.w) / intrinsicWidth(svg)})
-      .resize(slot.w, slot.h, {fit: "fill"})
+    return sharp(svg, {density: (72 * rect.w) / intrinsicWidth(svg)})
+      .resize(rect.w, rect.h, {fit: "fill"})
       .png()
       .toBuffer();
   });
-  return {
-    input,
-    top: Math.round(slot.cy - slot.h / 2),
-    left: Math.round(slot.cx - slot.w / 2)
-  };
+  return {input, top: rect.y, left: rect.x};
 }
 
 export async function renderImage(config: GeneratorConfig, plan: Plan): Promise<Buffer> {
@@ -90,38 +97,46 @@ export async function renderImage(config: GeneratorConfig, plan: Plan): Promise<
 
   const layers: OverlayOptions[] = [];
 
-  layers.push({input: await maskedLayer(overlayPath.background(traits.background_style), traits.base_template), blend: "screen"});
+  layers.push({
+    input: await maskedLayer(overlayPath.background(traits.background_style), traits.base_template, layout),
+    blend: "screen"
+  });
 
   if (drawsLayer("border_style", traits.border_style)) {
-    layers.push({input: await fullLayer(overlayPath.border(traits.border_style))});
+    layers.push({input: await canvasLayer(overlayPath.border(traits.border_style), layout)});
   }
 
   if (drawsLayer("halo", traits.halo)) {
-    layers.push({input: await maskedLayer(overlayPath.halo(traits.halo), traits.base_template), blend: "screen"});
+    layers.push({input: await maskedLayer(overlayPath.halo(traits.halo), traits.base_template, layout), blend: "screen"});
   }
 
   for (let i = 0; i < microIconsDrawOrder.length; i++) {
     const slot = layout.slots.micro[microIconSlots[i]!];
     if (!slot) throw new Error(`unknown micro icon slot "${microIconSlots[i]}"`);
-    layers.push(await slotLayer(overlayPath.micro(microIconsDrawOrder[i]!), slot));
+    layers.push(await slotLayer(overlayPath.micro(microIconsDrawOrder[i]!), slot, layout));
   }
 
   for (const group of ROLE_GROUPS) {
-    layers.push(await slotLayer(overlayPath.role(group, traits[group]), layout.slots.role[group]));
+    layers.push(await slotLayer(overlayPath.role(group, traits[group]), layout.slots.role[group], layout));
   }
 
   if (drawsLayer("badge", traits.badge)) {
-    layers.push(await slotLayer(overlayPath.badge(traits.badge), layout.slots.badge));
+    layers.push(await slotLayer(overlayPath.badge(traits.badge), layout.slots.badge, layout));
   }
 
   if (drawsLayer("easter_egg", traits.easter_egg)) {
-    layers.push(await slotLayer(overlayPath.easterEgg(traits.easter_egg), layout.slots.easter_egg));
+    layers.push(await slotLayer(overlayPath.easterEgg(traits.easter_egg), layout.slots.easter_egg, layout));
   }
 
   const base = sharp(basePath);
   const {width, height} = await base.metadata();
-  if (width !== layout.canvas || height !== layout.canvas) {
-    throw new Error(`${template.asset} is ${width}x${height}, expected ${layout.canvas}. Run \`npm run prepare-assets -- --force\`.`);
+  if (width !== layout.outputSize || height !== layout.outputSize) {
+    throw new Error(
+      `${template.asset} is ${width}x${height}, expected ${layout.outputSize}. Run \`npm run prepare-assets\`.`
+    );
   }
-  return base.composite(layers).png(PNG_OPTIONS).toBuffer();
+  // The card is fully opaque, so the alpha channel carries nothing. sharp applies
+  // composite late in its pipeline, so drop the channel in a second pass.
+  const composed = await base.composite(layers).png().toBuffer();
+  return sharp(composed).removeAlpha().png(PNG_OPTIONS).toBuffer();
 }

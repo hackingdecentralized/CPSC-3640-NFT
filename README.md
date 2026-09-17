@@ -84,7 +84,7 @@ Three places, three jobs:
 `generator/` is a separate, self-contained tool that renders a varied collection from
 five course-card templates plus a bulldog special edition: layered backgrounds,
 borders, halos, icons, badges and easter eggs, drawn deterministically from a seed.
-It produces 2048px PNGs and ERC-721 metadata for IPFS. See
+It produces 1024px PNGs and ERC-721 metadata for IPFS. See
 [generator/README.md](generator/README.md).
 
 It is independent of the contract above: the deployed contract embeds one fixed image
