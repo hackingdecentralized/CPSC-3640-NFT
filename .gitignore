@@ -27,3 +27,11 @@ web/public/proofs.json
 *.swp
 .idea/
 .vscode/
+
+# NFT generator: derived assets and all generated output. Rebuild with
+# `npm run prepare-assets`; the supplied sources and overlay SVGs are tracked.
+generator/output/
+generator/assets/base/
+generator/assets/masks/
+generator/assets/.prepared.json
+generator/.env

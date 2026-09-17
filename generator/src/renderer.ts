@@ -1,0 +1,127 @@
+/**
+ * Layered rendering (spec sections 4 and 13).
+ *
+ *   base template
+ *   + background overlay   screen blend, masked to open background
+ *   + border overlay
+ *   + central halo         screen blend, masked to open background
+ *   + micro icons          at their chosen slots
+ *   + role icons           under HUMAN / BLOCKCHAIN CONTRACT / AI
+ *   + badge
+ *   + easter egg
+ *
+ * "Masked" means clipped by the template's decorable mask, so those layers never
+ * touch the course text or the illustration. Every other layer sits in a slot that
+ * configuration validation has already proven clear of the text.
+ */
+import {existsSync, readFileSync} from "node:fs";
+import sharp, {type OverlayOptions} from "sharp";
+import {fromRoot} from "./paths";
+import {maskPath, overlayPath} from "./assets";
+import {drawsLayer} from "./compatibility";
+import {ROLE_GROUPS, type GeneratorConfig, type Slot} from "./types";
+import type {Plan} from "./traits";
+
+export const PNG_OPTIONS = {compressionLevel: 9, adaptiveFiltering: false, palette: false} as const;
+
+const cache = new Map<string, Promise<Buffer>>();
+const cached = (key: string, make: () => Promise<Buffer>): Promise<Buffer> => {
+  let hit = cache.get(key);
+  if (!hit) {
+    hit = make();
+    cache.set(key, hit);
+  }
+  return hit;
+};
+
+function requireFile(relativePath: string, hint: string): string {
+  const path = fromRoot(relativePath);
+  if (!existsSync(path)) throw new Error(`Missing asset ${relativePath}. ${hint}`);
+  return path;
+}
+
+const intrinsicWidth = (svgPath: string): number => {
+  const match = /<svg[^>]*\bwidth="([\d.]+)"/.exec(readFileSync(svgPath, "utf8"));
+  if (!match) throw new Error(`${svgPath} has no width attribute`);
+  return Number(match[1]);
+};
+
+/** A full-canvas SVG layer, clipped to where decoration is allowed on this template. */
+function maskedLayer(svgRelative: string, template: string): Promise<Buffer> {
+  return cached(`masked:${svgRelative}:${template}`, async () => {
+    const svg = requireFile(svgRelative, "Run `npm run build-overlays`.");
+    const mask = requireFile(maskPath(template), "Run `npm run prepare-assets`.");
+    return sharp(svg)
+      .ensureAlpha()
+      .composite([{input: mask, blend: "dest-in"}])
+      .png()
+      .toBuffer();
+  });
+}
+
+function fullLayer(svgRelative: string): Promise<Buffer> {
+  return cached(`full:${svgRelative}`, async () =>
+    sharp(requireFile(svgRelative, "Run `npm run build-overlays`.")).png().toBuffer()
+  );
+}
+
+/** An SVG rasterised at exactly the slot's size, and where it goes. */
+async function slotLayer(svgRelative: string, slot: Slot): Promise<OverlayOptions> {
+  const input = await cached(`slot:${svgRelative}:${slot.w}x${slot.h}`, async () => {
+    const svg = requireFile(svgRelative, "Run `npm run build-overlays`.");
+    return sharp(svg, {density: (72 * slot.w) / intrinsicWidth(svg)})
+      .resize(slot.w, slot.h, {fit: "fill"})
+      .png()
+      .toBuffer();
+  });
+  return {
+    input,
+    top: Math.round(slot.cy - slot.h / 2),
+    left: Math.round(slot.cx - slot.w / 2)
+  };
+}
+
+export async function renderImage(config: GeneratorConfig, plan: Plan): Promise<Buffer> {
+  const {traits, microIconsDrawOrder, microIconSlots} = plan;
+  const {layout} = config;
+  const template = config.baseTemplates[traits.base_template];
+  if (!template) throw new Error(`unknown base_template "${traits.base_template}"`);
+  const basePath = requireFile(template.asset, "Run `npm run prepare-assets`.");
+
+  const layers: OverlayOptions[] = [];
+
+  layers.push({input: await maskedLayer(overlayPath.background(traits.background_style), traits.base_template), blend: "screen"});
+
+  if (drawsLayer("border_style", traits.border_style)) {
+    layers.push({input: await fullLayer(overlayPath.border(traits.border_style))});
+  }
+
+  if (drawsLayer("halo", traits.halo)) {
+    layers.push({input: await maskedLayer(overlayPath.halo(traits.halo), traits.base_template), blend: "screen"});
+  }
+
+  for (let i = 0; i < microIconsDrawOrder.length; i++) {
+    const slot = layout.slots.micro[microIconSlots[i]!];
+    if (!slot) throw new Error(`unknown micro icon slot "${microIconSlots[i]}"`);
+    layers.push(await slotLayer(overlayPath.micro(microIconsDrawOrder[i]!), slot));
+  }
+
+  for (const group of ROLE_GROUPS) {
+    layers.push(await slotLayer(overlayPath.role(group, traits[group]), layout.slots.role[group]));
+  }
+
+  if (drawsLayer("badge", traits.badge)) {
+    layers.push(await slotLayer(overlayPath.badge(traits.badge), layout.slots.badge));
+  }
+
+  if (drawsLayer("easter_egg", traits.easter_egg)) {
+    layers.push(await slotLayer(overlayPath.easterEgg(traits.easter_egg), layout.slots.easter_egg));
+  }
+
+  const base = sharp(basePath);
+  const {width, height} = await base.metadata();
+  if (width !== layout.canvas || height !== layout.canvas) {
+    throw new Error(`${template.asset} is ${width}x${height}, expected ${layout.canvas}. Run \`npm run prepare-assets -- --force\`.`);
+  }
+  return base.composite(layers).png(PNG_OPTIONS).toBuffer();
+}

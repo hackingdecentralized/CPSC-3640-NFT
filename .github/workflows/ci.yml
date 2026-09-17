@@ -64,3 +64,42 @@ jobs:
 
       - name: Build the claim page
         run: npm --prefix web ci && npm --prefix web run build
+
+  generator:
+    name: NFT generator
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: generator
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Fail if the committed overlays are out of date
+        run: |
+          npm run build-overlays
+          git diff --exit-code assets/overlays
+
+      - name: Prepare assets
+        run: npm run prepare-assets
+
+      - name: Validate assets
+        run: npm run validate-assets
+
+      - name: Test, including pixel checks on real renders
+        run: npm test
+
+      - name: Rarity simulation
+        run: npm run rarity -- --count 10000
+
+      - name: Render a few previews
+        run: npm run preview -- --count 3

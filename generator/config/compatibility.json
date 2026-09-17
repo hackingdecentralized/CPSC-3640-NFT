@@ -1,0 +1,104 @@
+{
+  "$comment": "Template-specific trait rules, applied after the base template is chosen. 'avoid' values are invalid for that template: if one is drawn, only that trait is redrawn. 'preferred' values have their weight multiplied by preferredMultiplier for that template. A value named in the spec that exists in more than one group (chain, chip) is applied to every group containing it. Spec phrases that name no existing trait are listed under 'notApplicable' rather than guessed at.",
+
+  "preferredMultiplier": 2,
+
+  "templates": {
+    "tower_clock": {
+      "preferred": {
+        "background_style": ["plain_starfield", "dense_starfield"],
+        "halo": ["soft_gold"],
+        "micro_icons": ["book", "lock", "chain"],
+        "contract_icon": ["chain"],
+        "badge": ["genesis", "researcher", "honors"]
+      },
+      "avoid": {
+        "background_style": ["grid_overlay"]
+      },
+      "notApplicable": [
+        "'tree-specific decorative elements': no trait is tree-specific, so nothing is excluded."
+      ]
+    },
+
+    "knowledge_tree": {
+      "preferred": {
+        "background_style": ["dense_starfield", "light_particles"],
+        "halo": ["soft_cyan"],
+        "micro_icons": ["node", "spark"],
+        "badge": ["builder", "researcher"]
+      },
+      "avoid": {},
+      "notApplicable": [
+        "'stone motifs': no stone trait exists.",
+        "'heavy heraldic overlays': no heraldic overlay trait exists."
+      ]
+    },
+
+    "gothic_gate": {
+      "preferred": {
+        "background_style": ["vertical_glow"],
+        "halo": ["soft_gold"],
+        "micro_icons": ["book", "lock"],
+        "badge": ["honors", "project_deployer"]
+      },
+      "avoid": {
+        "background_style": ["grid_overlay"],
+        "halo": ["geometric_ring"]
+      },
+      "notApplicable": []
+    },
+
+    "modern_cube": {
+      "preferred": {
+        "background_style": ["grid_overlay"],
+        "halo": ["geometric_ring"],
+        "micro_icons": ["chip", "node"],
+        "ai_icon": ["chip"],
+        "contract_icon": ["cube"],
+        "badge": ["builder", "auditor", "project_deployer"]
+      },
+      "avoid": {},
+      "notApplicable": [
+        "'leaf motifs': no leaf trait exists.",
+        "'gothic heraldic overlays': no heraldic overlay trait exists."
+      ]
+    },
+
+    "yale_shield": {
+      "preferred": {
+        "border_style": ["double_gold"],
+        "halo": ["soft_gold"],
+        "easter_egg": ["tiny_yale_y"],
+        "badge": ["honors", "genesis", "staff", "ta_edition"]
+      },
+      "avoid": {
+        "background_style": ["light_particles"]
+      },
+      "notApplicable": []
+    },
+
+    "bulldog_special": {
+      "preferred": {
+        "halo": ["dual_gold_cyan"],
+        "background_style": ["light_particles"],
+        "micro_icons": ["book", "chain", "chip"],
+        "contract_icon": ["chain"],
+        "ai_icon": ["chip"],
+        "badge": ["early_minter", "builder", "genesis"]
+      },
+      "avoid": {
+        "easter_egg": ["rare_blue_flame"]
+      },
+      "notApplicable": [
+        "'heavy heraldic decoration': no heraldic trait exists."
+      ]
+    }
+  },
+
+  "$mappings": {
+    "tower_clock: 'heavy grid overlay'": "background_style = grid_overlay",
+    "gothic_gate: 'large modern geometric overlays'": "background_style = grid_overlay, halo = geometric_ring",
+    "yale_shield: 'dense cyber-particle effects'": "background_style = light_particles",
+    "bulldog_special: 'aggressive mascot effects'": "easter_egg = rare_blue_flame (a flame on a bulldog reads as a sports mascot)"
+  }
+}

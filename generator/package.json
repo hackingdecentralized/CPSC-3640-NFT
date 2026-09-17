@@ -1,0 +1,31 @@
+{
+  "name": "cpsc3640-nft-generator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic trait-layered image and metadata generator for the CPSC 3640/5400 course NFT",
+  "scripts": {
+    "prepare-assets": "tsx scripts/prepare-assets.ts",
+    "build-overlays": "tsx scripts/build-overlays.ts",
+    "validate-assets": "tsx scripts/validate-assets.ts",
+    "asset-sheet": "tsx scripts/asset-sheet.ts",
+    "generate": "tsx scripts/generate-one.ts",
+    "preview": "tsx scripts/generate-preview.ts",
+    "rarity": "tsx scripts/rarity-report.ts",
+    "set-image-cid": "tsx scripts/set-image-cid.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "sharp": "0.33.5"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "tsx": "4.19.2",
+    "typescript": "5.7.2",
+    "vitest": "2.1.8"
+  }
+}

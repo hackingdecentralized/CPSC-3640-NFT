@@ -1,0 +1,45 @@
+{
+  "$comment": "Base templates and their selection weights. Weights must sum to 100. 'source' is the supplied artwork, kept byte-for-byte; 'sha256' proves it is unchanged. 'asset' is the 2048x2048 copy produced by `npm run prepare-assets`.",
+  "tower_clock": {
+    "weight": 19,
+    "label": "Tower Clock",
+    "source": "assets/source/tower_clock.png",
+    "sha256": "02f8358440273cd5f1cacee8d678bfb5a6f30faabf3556941c85d31a679d1d8f",
+    "asset": "assets/base/tower_clock.png"
+  },
+  "knowledge_tree": {
+    "weight": 19,
+    "label": "Knowledge Tree",
+    "source": "assets/source/knowledge_tree.png",
+    "sha256": "5392b03fc1b111471f03552245d900faef8c4c5879660579151d9ef657617c06",
+    "asset": "assets/base/knowledge_tree.png"
+  },
+  "gothic_gate": {
+    "weight": 19,
+    "label": "Gothic Gate",
+    "source": "assets/source/gothic_gate.png",
+    "sha256": "f7ad26058322df68486a35460efeb327d5a850387fa26cc7c1c1fef060647b3d",
+    "asset": "assets/base/gothic_gate.png"
+  },
+  "modern_cube": {
+    "weight": 19,
+    "label": "Modern Cube",
+    "source": "assets/source/modern_cube.png",
+    "sha256": "331e7823efefa59edd47057db3cb78734fb2bdba00b7ccdbfaedc8958feff407",
+    "asset": "assets/base/modern_cube.png"
+  },
+  "yale_shield": {
+    "weight": 19,
+    "label": "Yale Shield",
+    "source": "assets/source/yale_shield.png",
+    "sha256": "c31a1440186c1d732c13a00873ed2023e9acd8c7c0fafe86896301d1f8ccfac0",
+    "asset": "assets/base/yale_shield.png"
+  },
+  "bulldog_special": {
+    "weight": 5,
+    "label": "Bulldog Special",
+    "source": "assets/source/bulldog_special.png",
+    "sha256": "b858a0d21ca9a9e114566d6577e9d6e07615ae40e1e6374b53e02178bfe9fe06",
+    "asset": "assets/base/bulldog_special.png"
+  }
+}

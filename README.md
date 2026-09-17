@@ -79,6 +79,17 @@ Three places, three jobs:
 | Ethereum Sepolia | the deployed contract | who owns what, and what the NFT looks like |
 | `gh-pages` | built static site | nothing; it is disposable output |
 
+## Trait-layered collection generator
+
+`generator/` is a separate, self-contained tool that renders a varied collection from
+five course-card templates plus a bulldog special edition: layered backgrounds,
+borders, halos, icons, badges and easter eggs, drawn deterministically from a seed.
+It produces 2048px PNGs and ERC-721 metadata for IPFS. See
+[generator/README.md](generator/README.md).
+
+It is independent of the contract above: the deployed contract embeds one fixed image
+and cannot display generated ones.
+
 ## Repository layout
 
 ```
@@ -90,6 +101,7 @@ nft/course-nft.svg             master artwork; course-nft-onchain.webp is what s
 allowlist/                     roster in, Merkle root and proofs out
 web/                           Vite + TypeScript + viem claim page
 scripts/                       artwork embedding, deployment recording, page publishing
+generator/                     trait-layered image and metadata generator (separate package)
 ```
 
 ## Setup

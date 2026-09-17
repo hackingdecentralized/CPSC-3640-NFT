@@ -1,0 +1,87 @@
+{
+  "$comment": "Every group's weights must sum to exactly 100, with at most two decimal places. Values are drawn in alphabetical order, so reordering keys here never changes an outcome; changing a weight or adding a value does.",
+
+  "background_style": {
+    "plain_starfield": 25,
+    "dense_starfield": 25,
+    "vertical_glow": 20,
+    "grid_overlay": 15,
+    "light_particles": 15
+  },
+
+  "border_style": {
+    "gold_cyan_standard": 35,
+    "double_gold": 20,
+    "cyan_glow": 20,
+    "segmented_circuit": 15,
+    "soft_holographic": 10
+  },
+
+  "halo": {
+    "none": 20,
+    "soft_gold": 30,
+    "soft_cyan": 20,
+    "dual_gold_cyan": 20,
+    "geometric_ring": 10
+  },
+
+  "micro_icon_count": {
+    "0": 40,
+    "1": 40,
+    "2": 20
+  },
+
+  "micro_icons": {
+    "book": 12.5,
+    "block": 12.5,
+    "chain": 12.5,
+    "coin": 12.5,
+    "chip": 12.5,
+    "spark": 12.5,
+    "lock": 12.5,
+    "node": 12.5
+  },
+
+  "human_icon": {
+    "person": 25,
+    "group": 25,
+    "handshake": 25,
+    "student": 25
+  },
+
+  "contract_icon": {
+    "chain": 25,
+    "document": 25,
+    "cube": 25,
+    "ledger": 25
+  },
+
+  "ai_icon": {
+    "chip": 25,
+    "network": 25,
+    "spark_brain": 25,
+    "agent_node": 25
+  },
+
+  "badge": {
+    "standard": 40,
+    "genesis": 10,
+    "early_minter": 10,
+    "builder": 10,
+    "researcher": 8,
+    "auditor": 6,
+    "project_deployer": 6,
+    "honors": 4,
+    "ta_edition": 3,
+    "staff": 3
+  },
+
+  "easter_egg": {
+    "none": 94,
+    "tiny_eth_gem": 1.5,
+    "tiny_bulldog": 1.5,
+    "tiny_yale_y": 1,
+    "tiny_lock": 1,
+    "rare_blue_flame": 1
+  }
+}
