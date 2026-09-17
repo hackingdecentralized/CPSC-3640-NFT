@@ -1,20 +1,30 @@
 {
   "network": "sepolia",
   "chainId": 11155111,
-  "contractAddress": "0x6217a848eed68ad8e33bee3e7f55edff7f28ab6a",
-  "deploymentBlock": 11721212,
-  "transactionHash": "0x217c3abdd382bbe8b65d597f2f41137426cd451cb707fc0a76c5d5fc80545473",
+  "contractAddress": "0x6c955bc3bd2892fd6e37c4c696f28f7a01b803f0",
+  "deploymentBlock": 11721692,
+  "transactionHash": "0xb94594233f171324201288c121bfe75f7ff749b038dccc232ac67b659f59fec4",
   "deployer": "0x6376b9b4ea797e48e0dc9349b2413d47d19d298e",
   "owner": "0x6376B9B4ea797E48e0dc9349B2413d47D19d298E",
   "merkleRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
   "claimOpen": true,
   "allowlistEnabled": false,
-  "revealable": true,
+  "onchainCards": true,
+  "renderer": "0xE6eC2B4E589c0d6BA81D1b33e1329B2e2C68914B",
+  "artwork": [
+    "0x4d8f61525d37ffF294Cb4f738Ef9c0663b1BD8ce",
+    "0x074b80bD5763275Efe0C14ca4fD10C9aFd43d286",
+    "0xC71E8EeDa4cf4e05a5fB8a5CB4C9f7E2dC3a4035",
+    "0x9a82d87968a9510dcf71B0506F332C3747a42830",
+    "0x4F052e76e37417885F6B14780158f8DfE16Fa549",
+    "0x5E4d10760735E7A2B1E8221610358cf753a3eb55"
+  ],
   "constructorArgs": [
     "0x6376B9B4ea797E48e0dc9349B2413d47D19d298E",
     "0x0000000000000000000000000000000000000000000000000000000000000000",
     "true",
-    "false"
+    "false",
+    "0xE6eC2B4E589c0d6BA81D1b33e1329B2e2C68914B"
   ],
-  "deployedAt": "2026-09-17T03:50:40.068Z"
+  "deployedAt": "2026-09-17T05:29:03.768Z"
 }
