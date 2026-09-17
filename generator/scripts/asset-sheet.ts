@@ -24,12 +24,12 @@ import {PUBLIC_PREVIEW_SALT, TEST_WALLETS, run} from "./cli";
 import {escapeHtml, page} from "./html";
 
 const SHOWCASE: Record<string, ForcedTraits> = {
-  tower_clock: {background_style: "dense_starfield", border_style: "segmented_circuit", halo: "soft_gold", micro_icons: ["book", "lock"], badge: "genesis", easter_egg: "tiny_eth_gem"},
-  knowledge_tree: {background_style: "light_particles", border_style: "cyan_glow", halo: "soft_cyan", micro_icons: ["node", "spark"], badge: "researcher", easter_egg: "tiny_lock"},
-  gothic_gate: {background_style: "vertical_glow", border_style: "double_gold", halo: "soft_gold", micro_icons: ["book"], badge: "honors", easter_egg: "none"},
-  modern_cube: {background_style: "grid_overlay", border_style: "segmented_circuit", halo: "geometric_ring", micro_icons: ["chip", "block"], badge: "auditor", easter_egg: "none"},
+  harkness_tower: {background_style: "dense_starfield", border_style: "segmented_circuit", halo: "soft_gold", micro_icons: ["book", "lock"], badge: "genesis", easter_egg: "tiny_eth_gem"},
+  elm_tree: {background_style: "light_particles", border_style: "cyan_glow", halo: "soft_cyan", micro_icons: ["node", "spark"], badge: "researcher", easter_egg: "tiny_lock"},
+  sterling_memorial_library: {background_style: "vertical_glow", border_style: "double_gold", halo: "soft_gold", micro_icons: ["book"], badge: "honors", easter_egg: "none"},
+  beinecke_library: {background_style: "grid_overlay", border_style: "segmented_circuit", halo: "geometric_ring", micro_icons: ["chip", "block"], badge: "auditor", easter_egg: "none"},
   yale_shield: {background_style: "plain_starfield", border_style: "double_gold", halo: "soft_gold", micro_icons: ["coin"], badge: "staff", easter_egg: "tiny_yale_y"},
-  bulldog_special: {background_style: "light_particles", border_style: "soft_holographic", halo: "dual_gold_cyan", micro_icons: ["chain", "chip"], badge: "early_minter", easter_egg: "tiny_bulldog"}
+  handsome_dan: {background_style: "light_particles", border_style: "soft_holographic", halo: "dual_gold_cyan", micro_icons: ["chain", "chip"], badge: "early_minter", easter_egg: "tiny_bulldog"}
 };
 
 run(async () => {

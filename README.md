@@ -90,10 +90,10 @@ Three places, three jobs:
 
 ## Trait-layered collection generator
 
-`generator/` renders the cards: five course-card templates plus a bulldog special
-edition, with layered backgrounds, borders, halos, icons, badges and easter eggs, drawn
-deterministically from `SHA256(tokenId : claimer : salt)`. It writes 1024px PNGs and
-ERC-721 metadata. See [generator/README.md](generator/README.md).
+`generator/` renders the cards: five Yale designs, from Harkness Tower to the Beinecke
+Library, plus a rarer Handsome Dan edition. Each gets layered backgrounds, borders,
+halos, icons, badges and easter eggs, drawn deterministically from
+`SHA256(tokenId : claimer : salt)`. It writes 1024px PNGs and ERC-721 metadata. See [generator/README.md](generator/README.md).
 
 The claim page imports its trait code and the layer rasters it exports, so the page and
 the reveal cannot disagree about a card. The salt is public on purpose, which means a

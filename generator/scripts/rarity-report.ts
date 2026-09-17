@@ -176,9 +176,9 @@ run(() => {
   writeFileSync(fromRoot("output", "rarity-report.md"), md.join("\n"));
 
   console.log(`Simulated ${n.toLocaleString()} tokens in ${Date.now() - started} ms`);
-  console.log("\nBase template   observed  expected");
+  console.log(`\n${"Base template".padEnd(28)} observed  expected`);
   for (const r of report.groups.base_template!) {
-    console.log(`  ${r.value.padEnd(15)} ${pct(r.observed).padStart(7)}  ${pct(r.expected).padStart(7)}`);
+    console.log(`  ${r.value.padEnd(26)} ${pct(r.observed).padStart(7)}  ${pct(r.expected).padStart(7)}`);
   }
   console.log(`\nInvalid combinations: ${invalidCombinations} (${pct(report.invalidCombinationRate)}), resamples: ${resamples}`);
   console.log(`Easter eggs: ${JSON.stringify(report.easterEggCounts)}`);

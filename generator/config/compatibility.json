@@ -4,7 +4,7 @@
   "preferredMultiplier": 2,
 
   "templates": {
-    "tower_clock": {
+    "harkness_tower": {
       "preferred": {
         "background_style": ["plain_starfield", "dense_starfield"],
         "halo": ["soft_gold"],
@@ -20,7 +20,7 @@
       ]
     },
 
-    "knowledge_tree": {
+    "elm_tree": {
       "preferred": {
         "background_style": ["dense_starfield", "light_particles"],
         "halo": ["soft_cyan"],
@@ -34,7 +34,7 @@
       ]
     },
 
-    "gothic_gate": {
+    "sterling_memorial_library": {
       "preferred": {
         "background_style": ["vertical_glow"],
         "halo": ["soft_gold"],
@@ -48,7 +48,7 @@
       "notApplicable": []
     },
 
-    "modern_cube": {
+    "beinecke_library": {
       "preferred": {
         "background_style": ["grid_overlay"],
         "halo": ["geometric_ring"],
@@ -77,7 +77,7 @@
       "notApplicable": []
     },
 
-    "bulldog_special": {
+    "handsome_dan": {
       "preferred": {
         "halo": ["dual_gold_cyan"],
         "background_style": ["light_particles"],
@@ -96,9 +96,9 @@
   },
 
   "$mappings": {
-    "tower_clock: 'heavy grid overlay'": "background_style = grid_overlay",
-    "gothic_gate: 'large modern geometric overlays'": "background_style = grid_overlay, halo = geometric_ring",
+    "harkness_tower: 'heavy grid overlay'": "background_style = grid_overlay",
+    "sterling_memorial_library: 'large modern geometric overlays'": "background_style = grid_overlay, halo = geometric_ring",
     "yale_shield: 'dense cyber-particle effects'": "background_style = light_particles",
-    "bulldog_special: 'aggressive mascot effects'": "easter_egg = rare_blue_flame (a flame on a bulldog reads as a sports mascot)"
+    "handsome_dan: 'aggressive mascot effects'": "easter_egg = rare_blue_flame (a flame on a bulldog reads as a sports mascot)"
   }
 }

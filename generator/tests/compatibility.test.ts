@@ -28,14 +28,14 @@ describe("template compatibility", () => {
   });
 
   it("resamples only the invalid trait", () => {
-    // Compare against a configuration where gothic_gate has no avoid rules at all.
+    // Compare against a configuration where sterling_memorial_library has no avoid rules at all.
     // Wherever the real run had to redraw, the redrawn traits may differ, but every
     // other trait must be identical: the redraw consumed nothing from their streams.
     const permissive = cloneConfig();
-    permissive.compatibility.templates.gothic_gate!.avoid = {};
+    permissive.compatibility.templates.sterling_memorial_library!.avoid = {};
 
     const redrawnGroups = ["background_style", "halo"] as const;
-    const gate = sweep.filter((p) => p.traits.base_template === "gothic_gate" && p.stats.resamples > 0);
+    const gate = sweep.filter((p) => p.traits.base_template === "sterling_memorial_library" && p.stats.resamples > 0);
     expect(gate.length).toBeGreaterThan(0);
 
     for (const plan of gate) {
@@ -49,11 +49,11 @@ describe("template compatibility", () => {
   });
 
   it("draws preferred values more often than their plain weight", () => {
-    // tower_clock prefers soft_gold (30% base weight). Doubled and renormalised it
+    // harkness_tower prefers soft_gold (30% base weight). Doubled and renormalised it
     // should land well above 30%.
-    const tower = sweep.filter((p) => p.traits.base_template === "tower_clock");
+    const tower = sweep.filter((p) => p.traits.base_template === "harkness_tower");
     const softGold = tower.filter((p) => p.traits.halo === "soft_gold").length / tower.length;
-    expect(allowedDistribution(config, "halo", "tower_clock").get("soft_gold")).toBeCloseTo(60 / 130, 6);
+    expect(allowedDistribution(config, "halo", "harkness_tower").get("soft_gold")).toBeCloseTo(60 / 130, 6);
     expect(softGold).toBeGreaterThan(0.4);
   });
 
@@ -87,8 +87,8 @@ describe("forced traits", () => {
   });
 
   it("can force the base template", () => {
-    expect(planTraits(config, seed, {base_template: "bulldog_special"}).traits.base_template).toBe(
-      "bulldog_special"
+    expect(planTraits(config, seed, {base_template: "handsome_dan"}).traits.base_template).toBe(
+      "handsome_dan"
     );
   });
 
@@ -100,7 +100,7 @@ describe("forced traits", () => {
 
   it("refuses a forced value that the template does not allow", () => {
     expect(() =>
-      planTraits(config, seed, {base_template: "gothic_gate", background_style: "grid_overlay"})
+      planTraits(config, seed, {base_template: "sterling_memorial_library", background_style: "grid_overlay"})
     ).toThrow(ForcedTraitError);
   });
 

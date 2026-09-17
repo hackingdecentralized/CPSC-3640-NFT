@@ -227,7 +227,7 @@ async function main() {
       existsSync(fromRoot(template.asset)) &&
       existsSync(fromRoot(maskPath(id)));
     if (upToDate && !DEBUG) {
-      console.log(`  ${id.padEnd(16)} up to date`);
+      console.log(`  ${id.padEnd(26)} up to date`);
       (manifest.templates as Record<string, string>)[id] = actual;
       continue;
     }
@@ -252,7 +252,7 @@ async function main() {
 
     (manifest.templates as Record<string, string>)[id] = actual;
     console.log(
-      `  ${id.padEnd(16)} ${outputSize}px, art ${info.art.w}x${info.art.h} at (${info.art.x},${info.art.y}) in design space, ` +
+      `  ${id.padEnd(26)} ${outputSize}px, art ${info.art.w}x${info.art.h} at (${info.art.x},${info.art.y}) in design space, ` +
         `decorable ${(info.decorableFraction * 100).toFixed(1)}%  (${Date.now() - started} ms)`
     );
   }

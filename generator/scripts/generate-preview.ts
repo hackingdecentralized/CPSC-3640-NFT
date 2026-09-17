@@ -15,7 +15,7 @@ import {fromRoot} from "../src/paths";
 import {PUBLIC_PREVIEW_SALT, TEST_WALLETS, intArg, parseArgs, run} from "./cli";
 import {escapeHtml, mapLimit, page} from "./html";
 
-const RARE = new Set(["bulldog_special", "tiny_eth_gem", "tiny_bulldog", "tiny_yale_y", "tiny_lock", "rare_blue_flame", "honors", "ta_edition", "staff"]);
+const RARE = new Set(["handsome_dan", "tiny_eth_gem", "tiny_bulldog", "tiny_yale_y", "tiny_lock", "rare_blue_flame", "honors", "ta_edition", "staff"]);
 
 run(async () => {
   const count = intArg(parseArgs(), "count", 20);

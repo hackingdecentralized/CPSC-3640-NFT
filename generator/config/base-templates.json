@@ -1,32 +1,32 @@
 {
   "$comment": "Base templates and their selection weights. Weights must sum to 100. 'source' is the supplied artwork, kept byte-for-byte; 'sha256' proves it is unchanged. 'asset' is the 2048x2048 copy produced by `npm run prepare-assets`.",
-  "tower_clock": {
+  "harkness_tower": {
     "weight": 19,
-    "label": "Tower Clock",
-    "source": "assets/source/tower_clock.png",
+    "label": "Harkness Tower",
+    "source": "assets/source/harkness_tower.png",
     "sha256": "02f8358440273cd5f1cacee8d678bfb5a6f30faabf3556941c85d31a679d1d8f",
-    "asset": "assets/base/tower_clock.png"
+    "asset": "assets/base/harkness_tower.png"
   },
-  "knowledge_tree": {
+  "elm_tree": {
     "weight": 19,
-    "label": "Knowledge Tree",
-    "source": "assets/source/knowledge_tree.png",
+    "label": "Elm Tree",
+    "source": "assets/source/elm_tree.png",
     "sha256": "5392b03fc1b111471f03552245d900faef8c4c5879660579151d9ef657617c06",
-    "asset": "assets/base/knowledge_tree.png"
+    "asset": "assets/base/elm_tree.png"
   },
-  "gothic_gate": {
+  "sterling_memorial_library": {
     "weight": 19,
-    "label": "Gothic Gate",
-    "source": "assets/source/gothic_gate.png",
+    "label": "Sterling Memorial Library",
+    "source": "assets/source/sterling_memorial_library.png",
     "sha256": "f7ad26058322df68486a35460efeb327d5a850387fa26cc7c1c1fef060647b3d",
-    "asset": "assets/base/gothic_gate.png"
+    "asset": "assets/base/sterling_memorial_library.png"
   },
-  "modern_cube": {
+  "beinecke_library": {
     "weight": 19,
-    "label": "Modern Cube",
-    "source": "assets/source/modern_cube.png",
+    "label": "Beinecke Rare Book & Manuscript Library",
+    "source": "assets/source/beinecke_library.png",
     "sha256": "331e7823efefa59edd47057db3cb78734fb2bdba00b7ccdbfaedc8958feff407",
-    "asset": "assets/base/modern_cube.png"
+    "asset": "assets/base/beinecke_library.png"
   },
   "yale_shield": {
     "weight": 19,
@@ -35,11 +35,11 @@
     "sha256": "c31a1440186c1d732c13a00873ed2023e9acd8c7c0fafe86896301d1f8ccfac0",
     "asset": "assets/base/yale_shield.png"
   },
-  "bulldog_special": {
+  "handsome_dan": {
     "weight": 5,
-    "label": "Bulldog Special",
-    "source": "assets/source/bulldog_special.png",
+    "label": "Handsome Dan",
+    "source": "assets/source/handsome_dan.png",
     "sha256": "b858a0d21ca9a9e114566d6577e9d6e07615ae40e1e6374b53e02178bfe9fe06",
-    "asset": "assets/base/bulldog_special.png"
+    "asset": "assets/base/handsome_dan.png"
   }
 }

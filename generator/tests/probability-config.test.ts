@@ -26,12 +26,12 @@ describe("probability configuration", () => {
       Object.entries(config.baseTemplates).map(([id, t]) => [id, t.weight])
     );
     expect(weights).toEqual({
-      tower_clock: 19,
-      knowledge_tree: 19,
-      gothic_gate: 19,
-      modern_cube: 19,
+      harkness_tower: 19,
+      elm_tree: 19,
+      sterling_memorial_library: 19,
+      beinecke_library: 19,
       yale_shield: 19,
-      bulldog_special: 5
+      handsome_dan: 5
     });
   });
 
@@ -70,7 +70,7 @@ describe("configuration validation rejects", () => {
 
   it("base templates that do not sum to 100", () => {
     const problems = problemsFor((c) => {
-      c.baseTemplates.bulldog_special!.weight = 6;
+      c.baseTemplates.handsome_dan!.weight = 6;
     });
     expect(problems.join()).toMatch(/base-templates sums to 101/);
   });
@@ -100,30 +100,30 @@ describe("configuration validation rejects", () => {
 
   it("a rule naming a value that does not exist", () => {
     const problems = problemsFor((c) => {
-      c.compatibility.templates.tower_clock!.avoid.halo = ["rainbow"];
+      c.compatibility.templates.harkness_tower!.avoid.halo = ["rainbow"];
     });
     expect(problems.join()).toMatch(/names "rainbow", which is not in traits\.halo/);
   });
 
   it("rules for a template that does not exist, or a template with no rules", () => {
     const problems = problemsFor((c) => {
-      c.compatibility.templates.moon_base = c.compatibility.templates.tower_clock!;
-      delete c.compatibility.templates.modern_cube;
+      c.compatibility.templates.moon_base = c.compatibility.templates.harkness_tower!;
+      delete c.compatibility.templates.beinecke_library;
     });
     expect(problems.join()).toMatch(/unknown template "moon_base"/);
-    expect(problems.join()).toMatch(/no rules for template "modern_cube"/);
+    expect(problems.join()).toMatch(/no rules for template "beinecke_library"/);
   });
 
   it("a template that avoids every value in a group", () => {
     const problems = problemsFor((c) => {
-      c.compatibility.templates.gothic_gate!.avoid.border_style = Object.keys(c.traits.border_style);
+      c.compatibility.templates.sterling_memorial_library!.avoid.border_style = Object.keys(c.traits.border_style);
     });
     expect(problems.join()).toMatch(/leaves only 0 drawable value\(s\) in "border_style"/);
   });
 
   it("a template that leaves fewer micro icons than can be drawn", () => {
     const problems = problemsFor((c) => {
-      c.compatibility.templates.gothic_gate!.avoid.micro_icons = Object.keys(c.traits.micro_icons).slice(1);
+      c.compatibility.templates.sterling_memorial_library!.avoid.micro_icons = Object.keys(c.traits.micro_icons).slice(1);
     });
     expect(problems.join()).toMatch(/needs 2/);
   });

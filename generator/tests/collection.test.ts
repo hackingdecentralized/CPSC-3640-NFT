@@ -36,7 +36,7 @@ describe("collection", () => {
     expect(collectionFingerprint(layout, collection)).not.toBe(fingerprint);
 
     const artwork = cloneConfig();
-    artwork.baseTemplates.tower_clock!.sha256 = "0".repeat(64);
+    artwork.baseTemplates.harkness_tower!.sha256 = "0".repeat(64);
     expect(collectionFingerprint(artwork, collection)).not.toBe(fingerprint);
   });
 

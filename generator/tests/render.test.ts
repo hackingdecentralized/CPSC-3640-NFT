@@ -11,12 +11,12 @@ import {SALT_X, WALLET_A, config} from "./helpers";
 
 /** The busiest legal trait set for each template: every layer that can draw, draws. */
 const BUSY: Record<string, ForcedTraits> = {
-  tower_clock: {background_style: "dense_starfield", border_style: "segmented_circuit", halo: "geometric_ring", micro_icons: ["book", "lock"], badge: "genesis", easter_egg: "tiny_eth_gem"},
-  knowledge_tree: {background_style: "light_particles", border_style: "cyan_glow", halo: "dual_gold_cyan", micro_icons: ["node", "spark"], badge: "researcher", easter_egg: "rare_blue_flame"},
-  gothic_gate: {background_style: "vertical_glow", border_style: "double_gold", halo: "soft_gold", micro_icons: ["coin", "chain"], badge: "honors", easter_egg: "tiny_lock"},
-  modern_cube: {background_style: "grid_overlay", border_style: "soft_holographic", halo: "geometric_ring", micro_icons: ["chip", "block"], badge: "auditor", easter_egg: "tiny_bulldog"},
+  harkness_tower: {background_style: "dense_starfield", border_style: "segmented_circuit", halo: "geometric_ring", micro_icons: ["book", "lock"], badge: "genesis", easter_egg: "tiny_eth_gem"},
+  elm_tree: {background_style: "light_particles", border_style: "cyan_glow", halo: "dual_gold_cyan", micro_icons: ["node", "spark"], badge: "researcher", easter_egg: "rare_blue_flame"},
+  sterling_memorial_library: {background_style: "vertical_glow", border_style: "double_gold", halo: "soft_gold", micro_icons: ["coin", "chain"], badge: "honors", easter_egg: "tiny_lock"},
+  beinecke_library: {background_style: "grid_overlay", border_style: "soft_holographic", halo: "geometric_ring", micro_icons: ["chip", "block"], badge: "auditor", easter_egg: "tiny_bulldog"},
   yale_shield: {background_style: "dense_starfield", border_style: "double_gold", halo: "soft_cyan", micro_icons: ["coin", "book"], badge: "ta_edition", easter_egg: "tiny_yale_y"},
-  bulldog_special: {background_style: "light_particles", border_style: "soft_holographic", halo: "dual_gold_cyan", micro_icons: ["chain", "chip"], badge: "staff", easter_egg: "tiny_bulldog"}
+  handsome_dan: {background_style: "light_particles", border_style: "soft_holographic", halo: "dual_gold_cyan", micro_icons: ["chain", "chip"], badge: "staff", easter_egg: "tiny_bulldog"}
 };
 
 const prepared = Object.keys(config.baseTemplates).every(
@@ -79,16 +79,16 @@ describe.skipIf(skip)("rendering", () => {
   });
 
   it("actually draws the overlays outside the protected regions", async () => {
-    const rendered = await raw(renders.get("tower_clock")!);
-    const base = await raw(fromRoot(config.baseTemplates.tower_clock!.asset));
+    const rendered = await raw(renders.get("harkness_tower")!);
+    const base = await raw(fromRoot(config.baseTemplates.harkness_tower!.asset));
     let changed = 0;
     for (let i = 0; i < rendered.data.length; i++) if (rendered.data[i] !== base.data[i]) changed++;
     expect(changed).toBeGreaterThan(config.layout.outputSize ** 2 / 20);
   });
 
   it("renders byte-identical output for the same inputs", async () => {
-    const plan = planTraits(config, deriveSeed(1, WALLET_A, SALT_X), {base_template: "bulldog_special", ...BUSY.bulldog_special});
+    const plan = planTraits(config, deriveSeed(1, WALLET_A, SALT_X), {base_template: "handsome_dan", ...BUSY.handsome_dan});
     const again = await renderImage(config, plan);
-    expect(again.equals(renders.get("bulldog_special")!)).toBe(true);
+    expect(again.equals(renders.get("handsome_dan")!)).toBe(true);
   }, 30_000);
 });

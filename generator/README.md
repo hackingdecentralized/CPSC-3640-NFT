@@ -37,6 +37,20 @@ tokenId, claimer address, collection salt
            output/metadata/<id>.json     ERC-721 metadata
 ```
 
+### The six designs
+
+| Id | Name | Share | Spec id |
+| --- | --- | ---: | --- |
+| `harkness_tower` | Harkness Tower | 19% | `tower_clock` |
+| `elm_tree` | Elm Tree | 19% | `knowledge_tree` |
+| `sterling_memorial_library` | Sterling Memorial Library | 19% | `gothic_gate` |
+| `beinecke_library` | Beinecke Rare Book & Manuscript Library | 19% | `modern_cube` |
+| `yale_shield` | Yale Shield | 19% | `yale_shield` |
+| `handsome_dan` | Handsome Dan | 5% | `bulldog_special` |
+
+The ids replace the spec's working names, and are what token metadata carries as
+"Base Template". The names are what the claim page shows.
+
 The same three inputs always give the same traits and a byte-identical PNG, as long as
 the pinned `sharp` version is the same. On another version expect visually identical
 output rather than identical bytes.
@@ -140,7 +154,7 @@ regions in `layout.json`. Three things keep them intact:
 | `npm run build-overlays` | regenerate every overlay SVG from `scripts/build-overlays.ts` |
 | `npm run validate-assets` | check sources are unchanged, prepared assets are current, masks protect the text, and every overlay exists at the right size |
 | `npm run asset-sheet` | `output/asset-sheet/index.html`: regions, masks, showcase renders, every overlay |
-| `npm run generate -- --token-id 123 --wallet 0x...` | one token, with the collection salt; add `--badge staff`, `--base bulldog_special`, `--cid`, `--out`, `--salt` |
+| `npm run generate -- --token-id 123 --wallet 0x...` | one token, with the collection salt; add `--badge staff`, `--base handsome_dan`, `--cid`, `--out`, `--salt` |
 | `npm run preview -- --count 20` | `output/preview/index.html` |
 | `npm run rarity -- --count 10000` | `output/rarity-report.{json,md}`, no rendering |
 | `npm run export-web` | the card layers the claim page draws with, into `../web/public/nft/` |
@@ -244,7 +258,7 @@ show generated cards; revealing needs the current contract.
 | `assets/base/`, `assets/masks/` | derived by `prepare-assets` | no |
 | `output/` | everything generated | no |
 
-Five templates are exactly the files supplied. `bulldog_special` is the bulldog card
+Five templates are exactly the files supplied. `handsome_dan` is the bulldog card
 already used by this project, extracted unchanged from `nft/course-nft.svg`.
 
 Badge labels use a small stroke font drawn as paths (`src/strokeFont.ts`), not SVG
