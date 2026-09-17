@@ -27,7 +27,7 @@ import {WEB_INDEX, layerFile, sampleFile, type WebIndex} from "../src/webAssets"
 import {mapLimit} from "./html";
 import {parseArgs, run, stringArg} from "./cli";
 
-const SAMPLE_SIZE = 480;
+const SAMPLE_SIZE = 1024;
 const SAMPLE_WALLET = "0x0000000000000000000000000000000000000000";
 
 /**
@@ -77,7 +77,7 @@ run(async () => {
   const samples: Record<string, string> = {};
   for (const template of Object.keys(config.baseTemplates)) {
     const image = await renderImage(config, samplePlan(config, template));
-    write(sampleFile(template), await sharp(image).resize(SAMPLE_SIZE, SAMPLE_SIZE).webp({quality: 82}).toBuffer());
+    write(sampleFile(template), await sharp(image).resize(SAMPLE_SIZE, SAMPLE_SIZE).webp({quality: 80}).toBuffer());
     samples[template] = sampleFile(template);
   }
 

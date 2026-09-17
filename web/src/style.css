@@ -63,6 +63,8 @@ body {
    them to a shared height turns the shorter one into a mostly empty box, and the
    panel is far shorter than the artwork in the connect and not-deployed stages. */
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: center; }
+/* Without this, the slideshow's off-screen slides would widen its column. */
+.grid > * { min-width: 0; }
 @media (max-width: 780px) { .grid { grid-template-columns: 1fr; } }
 
 .card {
@@ -74,24 +76,37 @@ body {
 .art img, .art svg { display: block; width: 100%; height: auto; border-radius: 8px; }
 .art figcaption { margin-top: 10px; text-align: center; color: var(--muted); font-size: 13px; }
 
-/* The six designs, shown before claiming. */
-.designs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.designs figure { margin: 0; min-width: 0; }
-.designs img, .designs .tile {
-  display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 6px; background: var(--ink-2);
+/* The six designs, shown before claiming, one at a time. */
+.slideshow { position: relative; }
+.slide-stage { position: relative; }
+.slides {
+  display: flex; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+  border-radius: 8px; scrollbar-width: none;
 }
-.designs figcaption {
-  margin-top: 5px; font-size: 12px; line-height: 1.35; color: var(--text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.slides::-webkit-scrollbar { display: none; }
+.slides:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+.slide { flex: 0 0 100%; margin: 0; scroll-snap-align: center; scroll-snap-stop: always; }
+.art .slide img, .tile {
+  display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 8px; background: var(--ink-2);
 }
-.designs figcaption span { display: block; color: var(--muted); font-size: 11.5px; }
-/* Three small tiles keep the grid about as tall as one card, so on a phone the claim
-   panel below it stays close to the top. */
-@media (max-width: 480px) {
-  .designs { gap: 8px; }
-  .designs figcaption { font-size: 11px; }
-  .designs figcaption span { font-size: 10.5px; }
+.slide-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 38px; height: 38px; padding: 0; border-radius: 50%;
+  display: grid; place-items: center; font-size: 26px; line-height: 1;
+  background: rgba(23, 22, 28, 0.72); border: 1px solid var(--line); color: var(--text);
 }
+.slide-nav:hover:not(:disabled) { border-color: var(--amber); }
+.slide-nav.prev { left: 10px; }
+.slide-nav.next { right: 10px; }
+.slide-caption { margin: 12px 0 0; text-align: center; font-size: 15px; }
+.slide-caption span { margin-left: 6px; color: var(--muted); font-size: 13px; }
+.slide-dots { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
+.slide-dots button {
+  width: 8px; height: 8px; padding: 0; border-radius: 4px; background: var(--line);
+  transition: width 0.2s ease, background-color 0.2s ease;
+}
+.slide-dots button[aria-current="true"] { width: 22px; background: var(--amber); }
+@media (prefers-reduced-motion: reduce) { .slide-dots button { transition: none; } }
 
 /* Holds the card's square while it is drawn, so nothing jumps when it arrives. */
 .pending-card { aspect-ratio: 1; display: flex; flex-direction: column; justify-content: center; padding: 8%; }

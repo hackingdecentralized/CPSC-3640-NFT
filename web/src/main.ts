@@ -20,6 +20,7 @@ import "./style.css";
 import courseArtwork from "../../nft/course-nft-onchain.webp";
 
 import {FINGERPRINT, designs, drawCard, loadAssets, type Card, type Design} from "./card";
+import {mountSlideshow, slideshowHtml} from "./slideshow";
 import {
   CHAIN_ID,
   CONTRACT_ADDRESS,
@@ -443,19 +444,7 @@ function artwork(): string {
 }
 
 function designsFigure(): string {
-  const tiles = state.designs
-    ? state.designs
-        .map(
-          ({label, odds, sample}) => `<figure>
-            <img src="${sample}" alt="Example ${escapeHtml(label)} card" width="480" height="480" />
-            <figcaption>${escapeHtml(label)} <span>${odds}%</span></figcaption>
-          </figure>`
-        )
-        .join("")
-    : '<figure aria-hidden="true"><div class="tile"></div><figcaption>&nbsp;<span>&nbsp;</span></figcaption></figure>'.repeat(6);
-  return `<figure class="card art">
-    <div class="designs">${tiles}</div>
-  </figure>`;
+  return `<figure class="card art">${slideshowHtml(state.designs ?? undefined, escapeHtml)}</figure>`;
 }
 
 function cardFigure(tokenId: bigint): string {
@@ -496,38 +485,69 @@ function chainbar(): string {
   </div>`;
 }
 
+/** The HTML each region last received, so a region whose content is unchanged is left alone. */
+const rendered = new Map<string, string>();
+
+/**
+ * Write each region that changed. Leaving the others untouched keeps whatever the
+ * visitor is doing there, such as which design the slideshow is on, across the
+ * count poll's re-renders.
+ */
 function render(): void {
-  root.innerHTML = `
-    <header class="masthead">
-      <h1>${escapeHtml(COURSE.code)}</h1>
-      <p>${escapeHtml(COURSE.title)}</p>
-      <div class="term">${escapeHtml(COURSE.term)}</div>
-    </header>
-    ${stepper(STEP_OF[state.stage])}
-    <div class="grid">
-      ${artwork()}
-      <section class="card stack">${panel()}</section>
-    </div>
-    ${chainbar()}
-    <p class="disclaimer">
-      &copy; Yale ${escapeHtml(COURSE.code)},
-      <a href="${COURSE.site}" target="_blank" rel="noopener noreferrer">${escapeHtml(COURSE.site)}</a>
-    </p>
-  `;
+  if (!root.querySelector("[data-region]")) {
+    root.innerHTML = `
+      <header class="masthead">
+        <h1>${escapeHtml(COURSE.code)}</h1>
+        <p>${escapeHtml(COURSE.title)}</p>
+        <div class="term">${escapeHtml(COURSE.term)}</div>
+      </header>
+      <div data-region="steps"></div>
+      <div class="grid">
+        <div data-region="art"></div>
+        <section class="card stack" data-region="panel"></section>
+      </div>
+      <div data-region="chain"></div>
+      <p class="disclaimer">
+        &copy; Yale ${escapeHtml(COURSE.code)},
+        <a href="${COURSE.site}" target="_blank" rel="noopener noreferrer">${escapeHtml(COURSE.site)}</a>
+      </p>
+    `;
+    rendered.clear();
+  }
 
-  bind("reload", () => window.location.reload());
-  bind("copy", copyAddress);
-  bind("recheck", () => void refresh());
-  bind("connect", connect);
-  bind("switch", switchNetwork);
-  bind("claim", claim);
-  bind("cancel", () => refresh());
-  bind("redraw", () => void showCard());
+  region("steps", stepper(STEP_OF[state.stage]));
+  const art = region("art", artwork());
+  if (art) mountSlideshow(art);
+  region("panel", panel());
+  region("chain", chainbar());
 }
 
-function bind(id: string, handler: () => void): void {
-  document.getElementById(id)?.addEventListener("click", handler);
+/** Replace a region's content if it differs from last time. Returns the region if it did. */
+function region(name: string, html: string): HTMLElement | null {
+  if (rendered.get(name) === html) return null;
+  const element = root.querySelector<HTMLElement>(`[data-region="${name}"]`)!;
+  element.innerHTML = html;
+  rendered.set(name, html);
+  return element;
 }
+
+/** Every button with an id is handled here, so re-rendered buttons need no rebinding. */
+const ACTIONS: Record<string, () => void> = {
+  reload: () => window.location.reload(),
+  copy: () => void copyAddress(),
+  recheck: () => void refresh(),
+  connect: () => void connect(),
+  switch: () => void switchNetwork(),
+  claim: () => void claim(),
+  cancel: () => void refresh(),
+  redraw: () => void showCard()
+};
+
+// A property rather than addEventListener: there is exactly one page handler.
+root.onclick = (event) => {
+  const button = (event.target as Element | null)?.closest<HTMLButtonElement>("button[id]");
+  if (button && !button.disabled) ACTIONS[button.id]?.();
+};
 
 // ---------------------------------------------------------------------------
 // Actions
