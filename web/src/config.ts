@@ -30,6 +30,7 @@ export interface Deployment {
    * before. Records from before cards existed do not have it, which means no.
    */
   revealable?: boolean | null;
+  onchainCards?: boolean;
 }
 
 export interface NetworkConfig {

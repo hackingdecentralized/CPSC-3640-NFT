@@ -278,6 +278,7 @@ function panel(): string {
     case "connecting": {
       const busy = state.stage === "connecting";
       return `<h2>Claim your course NFT</h2>
+        ${DEPLOYMENT.onchainCards ? '<p class="lede">Six base designs. Your card adds an accent, a symbol and your claim number.</p>' : ""}
         <p class="lede">Connect a wallet to check whether you are on the allowlist.</p>
         ${noticeBlock()}
         ${busy ? statusBlock("info", "Waiting for your wallet...", "Approve the connection request.", {spinner: true}) : ""}
