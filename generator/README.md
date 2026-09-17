@@ -158,8 +158,9 @@ regions in `layout.json`. Three things keep them intact:
 | `npm run preview -- --count 20` | `output/preview/index.html` |
 | `npm run rarity -- --count 10000` | `output/rarity-report.{json,md}`, no rendering |
 | `npm run export-web` | the card layers the claim page draws with, into `../web/public/nft/` |
-| `npm run collection -- --network sepolia` | every claimed token, read from the contract, into `output/collection/sepolia/` |
+| `npm run collection -- --network sepolia` | every claimed token, read from the contract at its latest finalized block, into `output/collection/sepolia/`; `--expect`, `--block` |
 | `npm run set-image-cid -- --dir <dir> --cid <CID>` | point metadata at uploaded images |
+| `npm run check-reveal -- --network sepolia --uri ipfs://<CID>/` | compare a collection with the chain and its upload; `scripts/reveal.sh` runs it |
 | `npm test` | the test suite |
 
 ### Reserved badges
@@ -204,9 +205,12 @@ Measured on a real claim: the page's card matched the generated PNG to within 2 
 out of 255 on every channel, with 93% of values identical. The downloaded image and
 the revealed one look the same. They are not byte-identical files.
 
-The page's footer shows a **collection fingerprint**: a digest of the salt, weights,
-rules, layout and template hashes. `npm run collection -- --expect <fingerprint>`
-refuses to generate if this checkout disagrees with the page students used.
+The page's footer shows a **collection fingerprint** (`src/fingerprint.ts`), written by
+`export-web`. It digests three things: the configuration and salt, minus display names;
+the source of every module the page shares; and every layer raster, pixel for pixel,
+which covers the overlays, the templates, their masks and the sharp version.
+`npm run collection -- --expect <fingerprint>` recomputes it and refuses to generate if
+this checkout would draw different cards than the page students used.
 
 `web/public/nft/` is derived and not committed. `scripts/publish-pages.sh` rebuilds it
 before every publish.
@@ -228,9 +232,14 @@ cd ..
 scripts/reveal.sh sepolia publish <METADATA_CID>
 ```
 
-`publish` downloads the last token's metadata and image back through a gateway and
-refuses to continue unless both match what was generated. Set `IPFS_GATEWAY` to your
-pinning service's gateway if the public one is slow to see a new upload.
+`collection` reads Sepolia at its latest finalized block, so a reorganisation cannot
+reorder the claims a collection was drawn from; newer claims wait for the next run.
+`publish` runs `check-reveal` first. That confirms every token's claimer against the
+chain, and fetches every metadata file and every image back to compare with what was
+generated. A mismatch or a missing file stops it; a file a gateway cannot serve yet
+earns a warning and a question. Set `IPFS_GATEWAY` to your pinning service's gateway if
+the public one is slow to see a new upload, and `REVEAL_QUICK=1` to download only the
+first and last image.
 
 You can reveal as often as you like while claiming is open; each run covers everyone who
 has claimed so far. To finish:
@@ -241,9 +250,10 @@ scripts/reveal.sh sepolia close      # no more claims
 scripts/reveal.sh sepolia freeze     # permanent; claiming can never reopen
 ```
 
-`freeze` requires every token to be revealed, and it ends claiming for good: an IPFS
-directory cannot gain files, so a token minted afterwards could never get its card.
-`scripts/reveal.sh sepolia status` shows where things stand.
+`freeze` requires every token to be revealed, runs the same checks against what the
+contract points at, and ends claiming for good: an IPFS directory cannot gain files, so a
+token minted afterwards could never get its card. `scripts/reveal.sh sepolia status`
+shows where things stand.
 
 No IPFS provider is assumed. Pinned content stays available only while someone keeps
 paying for the pin. The first Sepolia deployment predates all of this and can never

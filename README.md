@@ -128,8 +128,9 @@ npm --prefix generator run prepare-assets    # 1024px bases and masks
 npm --prefix generator run export-web        # card layers for the claim page
 ```
 
-The last three are what let the claim page draw cards. Without them it still works, and
-shows the on-chain artwork instead.
+The last three are what let the claim page draw cards. Without them the page still
+works: it shows the on-chain artwork where it can, and says so when it cannot draw a
+card.
 
 Already cloned without `--recursive`:
 
@@ -245,8 +246,9 @@ The card on the page is the one `npm --prefix generator run generate -- --token-
 --wallet <account #0>` renders.
 
 **5. Optionally, rehearse the reveal.** Follow [Revealing the cards](#revealing-the-cards)
-with `anvil` in place of `sepolia`. On the local chain, `publish` also accepts a plain
-`http://` base URL, so any local web server can stand in for IPFS metadata.
+with `anvil` in place of `sepolia`. A local web server can stand in for IPFS: copy the
+two directories to `<root>/ipfs/<cid>/` under any made-up CIDs, serve `<root>`, and set
+`IPFS_GATEWAY` to that server.
 
 ## Deploying to Sepolia
 
@@ -304,7 +306,8 @@ than guessing them, so the bytecode lines up.
 
 The first Sepolia deployment, `0x91e67ce5...`, predates reveal support: its tokens will
 only ever show the on-chain artwork, and the page shows that artwork for it rather than
-cards. Generated cards need the current contract, which means a new deployment. Tokens
+cards. Its record says so (`"revealable": false`); `scripts/deploy.sh` records the
+answer for every new deployment, so the page knows before anyone connects. Generated cards need the current contract, which means a new deployment. Tokens
 minted on the old contract stay where they are.
 
 **4. Commit the deployment record and publish.**
@@ -361,7 +364,7 @@ every claimed card, uploading it, and pointing the contract at it:
 
 ```
 generator: npm run collection -- --network sepolia --expect <fingerprint>
-        |      reads totalMinted and claimerOf from the contract
+        |      reads totalMinted and claimerOf at the latest finalized block
         v
 upload output/collection/sepolia/images            -> IMAGE_CID
 npm run set-image-cid -- --dir output/collection/sepolia --cid <IMAGE_CID>
@@ -369,13 +372,30 @@ upload output/collection/sepolia/metadata          -> METADATA_CID
         |
         v
 scripts/reveal.sh sepolia publish <METADATA_CID>
-        |      checks the upload matches, then setBaseURI("ipfs://<cid>/", count)
+        |      checks every token and every uploaded file, then
+        |      setBaseURI("ipfs://<cid>/", count)
         v
 tokens 1..count now read ipfs://<cid>/<id>.json
 ```
 
-`<fingerprint>` is the "Collection" value in the claim page's footer. If this checkout
+`<fingerprint>` is the "Collection" value in the claim page's footer. It covers the
+configuration, the code that draws cards and every layer's pixels, so if this checkout
 would generate different cards than the page showed, the command stops.
+
+The collection is read at Sepolia's latest finalized block, roughly 15 minutes back, so
+a chain reorganisation cannot reorder the claims it was drawn from. Newer claims wait
+for the next run.
+
+Before `publish` sends anything, it checks, for every token:
+
+- the chain still says it was claimed by the address its card was drawn from
+- its metadata file is in the upload, identical to the generated one
+- its image is in the upload, byte for byte
+
+A mismatch or a missing file stops it. Files a gateway cannot serve yet (common for a
+few minutes after an upload) get a warning and a question instead. Set `IPFS_GATEWAY` to
+your pinning service's gateway to read uploads back sooner, and `REVEAL_QUICK=1` to
+download only the first and last image and just confirm the rest exist.
 
 A reveal covers the tokens that existed when the collection was generated. Tokens
 claimed later keep the placeholder until the next reveal, so you can reveal as often as
@@ -390,10 +410,11 @@ scripts/reveal.sh sepolia freeze
 
 Freezing is irreversible: the metadata location can never change again, and claiming
 can never reopen, because a token minted afterwards could never be revealed. The
-contract refuses to freeze until every token is revealed.
+contract refuses to freeze until every token is revealed, and `freeze` first runs the
+same checks as `publish` against what the contract points at now.
 
 `reveal.sh` reads `DEPLOYER_PRIVATE_KEY` and `SEPOLIA_RPC_URL` from `.env`, and the key
-must be the contract owner's. It never puts the key on a command line.
+must be the contract owner's. `close` and `open` also work on the first deployment.
 
 ## GitHub Pages and CI
 
@@ -437,9 +458,14 @@ The contract is the only thing enforcing anything.
 - **The collection salt is public by design.** Anyone can work out which card a token id
   and address would get. That is what lets the page draw cards without a server; the
   cost is that rarity can be predicted. See `generator/README.md`.
-- **A reveal is checked before it is sent.** `scripts/reveal.sh publish` fetches the
-  uploaded files back and compares them with the generated ones, and the contract only
-  accepts a reveal that covers tokens which exist.
+- **A reveal is checked before it is sent.** `scripts/reveal.sh` compares every token's
+  claimer with the chain and every uploaded file with the generated one before it
+  publishes or freezes, and the contract only accepts a reveal that covers tokens which
+  exist.
+- **No secret goes on a command line**, where other processes on the machine could read
+  it. The scripts pass the key, the Sepolia endpoint and the Etherscan key to Foundry
+  through the environment, and the endpoint through a `sepolia` alias in
+  `foundry.toml`.
 
 If a private key ever does reach a commit, rotating the file is not enough. Treat the key
 as compromised, move the contract owner to a fresh key, and rewrite history.

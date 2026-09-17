@@ -19,14 +19,19 @@
  * --expect takes the fingerprint shown at the foot of the claim page. If it differs,
  * the page and this checkout disagree about the collection, and nothing is written.
  *
+ * On Sepolia the chain is read at the latest finalized block, about 15 minutes back,
+ * so a reorganisation cannot reorder the claims a collection was drawn from. Claims
+ * newer than that wait for the next run. --block latest|safe|finalized|<number>
+ * overrides it; a local chain is read at latest, since it never finalizes.
+ *
  * RPC: SEPOLIA_RPC_URL from the environment, generator/.env or the repository's .env.
  * Anvil uses http://127.0.0.1:8545 unless ANVIL_RPC_URL is set.
  */
 import {createHash} from "node:crypto";
 import {existsSync, readdirSync, readFileSync, rmSync, writeFileSync} from "node:fs";
 import {join, relative, resolve} from "node:path";
-import {zeroAddress} from "viem";
-import {collectionFingerprint} from "../src/collection";
+import {zeroAddress, type BlockTag} from "viem";
+import {collectionFingerprint} from "../src/fingerprint";
 import {generateNFT} from "../src/generator";
 import {loadCollection, loadConfig} from "../src/loadConfig";
 import {fromRoot} from "../src/paths";
@@ -35,6 +40,11 @@ import {COLLECTION_MANIFEST, type CollectionManifest} from "./manifest";
 import {mapLimit} from "./html";
 import {parseArgs, run, stringArg} from "./cli";
 
+function parseBlockTag(value: string): BlockTag {
+  if (value === "latest" || value === "safe" || value === "finalized") return value;
+  throw new Error(`--block must be latest, safe, finalized or a block number, not "${value}"`);
+}
+
 run(async () => {
   const args = parseArgs();
   const network = stringArg(args, "network");
@@ -42,19 +52,24 @@ run(async () => {
 
   const config = loadConfig();
   const collection = loadCollection();
-  const fingerprint = collectionFingerprint(config, collection);
+  const {fingerprint} = await collectionFingerprint(config, collection);
   const expected = stringArg(args, "expect");
   if (expected && expected !== fingerprint) {
     throw new Error(
       `This checkout's collection fingerprint is ${fingerprint}, but ${expected} was expected.\n` +
-        "The claim page was built from a different configuration, salt or artwork, so these cards would not\n" +
+        "The claim page was built from a different configuration, salt, code or artwork, so these cards would not\n" +
         "match what students were shown. Check out the commit the page was published from."
     );
   }
 
   const {client, deployment} = await connect(network);
   const address = deployment.contractAddress;
-  const blockNumber = await client.getBlockNumber();
+  const blockArg = stringArg(args, "block") ?? (network === "sepolia" ? "finalized" : "latest");
+  const block = /^\d+$/.test(blockArg)
+    ? await client.getBlock({blockNumber: BigInt(blockArg)})
+    : await client.getBlock({blockTag: parseBlockTag(blockArg)});
+  const blockNumber = block.number;
+  if (blockNumber === null) throw new Error(`block "${blockArg}" is still pending; pick a mined block`);
   const read = {address, abi: NFT_ABI, blockNumber} as const;
 
   const revealedCount = await client.readContract({...read, functionName: "revealedCount"}).catch(() => {
@@ -70,9 +85,16 @@ run(async () => {
   ]);
   if (frozen) throw new Error("The collection is frozen. Its metadata can never change, so there is nothing to generate.");
   const count = Number(totalMinted);
-  if (count === 0) throw new Error("Nobody has claimed a token yet.");
+  const newest = Number(await client.readContract({address, abi: NFT_ABI, functionName: "totalMinted"}));
+  if (count === 0) {
+    throw new Error(
+      newest > 0
+        ? `No claim is ${blockArg} yet at block ${blockNumber}; the ${newest} claim(s) so far are too recent. Try again shortly.`
+        : "Nobody has claimed a token yet."
+    );
+  }
 
-  console.log(`${network} ${address} at block ${blockNumber}: ${count} claimed, ${revealedCount} revealed`);
+  console.log(`${network} ${address} at ${blockArg} block ${blockNumber}: ${count} claimed, ${revealedCount} revealed`);
   console.log(`Collection fingerprint ${fingerprint}\n`);
 
   const ids = Array.from({length: count}, (_, i) => i + 1);
@@ -104,6 +126,7 @@ run(async () => {
     chainId: deployment.chainId,
     contract: address,
     blockNumber: Number(blockNumber),
+    blockTag: blockArg,
     count,
     fingerprint,
     salt: collection.salt,
@@ -115,6 +138,12 @@ run(async () => {
 
   const shown = relative(fromRoot(), dir);
   console.log(`\nGenerated ${count} card(s) in ${((Date.now() - started) / 1000).toFixed(1)} s into generator/${shown}/`);
+  if (newest > count) {
+    console.log(
+      `\n${newest - count} newer claim(s) are not ${blockArg} yet, so they are not included. They keep the\n` +
+        "placeholder until the next run."
+    );
+  }
   if (claimOpen) {
     console.log(
       "\nClaiming is still open. Tokens claimed after this block keep the placeholder until you run this again.\n" +

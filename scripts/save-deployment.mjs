@@ -56,6 +56,23 @@ if (!receipt) {
 // off passes a zero root while that file still holds a real one.
 const [owner, merkleRoot, claimOpen, allowlistEnabled] = tx.arguments ?? [];
 
+// Whether this contract gives tokens generated cards, so the claim page knows before a
+// wallet connects. Read from the compiled contract, but only once the deployed
+// creation code has been matched to it: a stale out/ must not decide this.
+function revealSupport() {
+  const artifactPath = join(ROOT, "out", "CPSC3640NFT.sol", "CPSC3640NFT.json");
+  if (!existsSync(artifactPath)) return null;
+  const artifact = JSON.parse(readFileSync(artifactPath, "utf8"));
+  const code = String(artifact.bytecode?.object ?? "").replace(/^0x/, "").toLowerCase();
+  const sent = String(tx.transaction.input ?? tx.transaction.data ?? "").replace(/^0x/, "").toLowerCase();
+  if (!code || !sent.startsWith(code)) return null;
+  return artifact.abi.some((item) => item.type === "function" && item.name === "revealedCount");
+}
+const revealable = revealSupport();
+if (revealable === null) {
+  console.warn("warning: the deployed code does not match out/, so whether it supports cards is not recorded");
+}
+
 const record = {
   network,
   chainId,
@@ -67,6 +84,7 @@ const record = {
   merkleRoot: merkleRoot ?? null,
   claimOpen: claimOpen === undefined ? null : claimOpen === "true",
   allowlistEnabled: allowlistEnabled === undefined ? null : allowlistEnabled === "true",
+  revealable,
   // Exactly what was passed to the constructor. Explorer verification needs these
   // to match byte for byte, so they are recorded rather than reconstructed later.
   constructorArgs: tx.arguments ?? null,

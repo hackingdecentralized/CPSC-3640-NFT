@@ -14,6 +14,7 @@
     "rarity": "tsx scripts/rarity-report.ts",
     "collection": "tsx scripts/collection.ts",
     "set-image-cid": "tsx scripts/set-image-cid.ts",
+    "check-reveal": "tsx scripts/check-reveal.ts",
     "export-web": "tsx scripts/export-web.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

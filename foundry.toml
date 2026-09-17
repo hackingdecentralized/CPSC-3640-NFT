@@ -31,5 +31,10 @@ tab_width = 4
 bracket_spacing = false
 int_types = "long"
 
+# Scripts pass `--rpc-url sepolia`, so the endpoint, which usually embeds an API key,
+# is read from the environment and never appears on a command line.
+[rpc_endpoints]
+sepolia = "${SEPOLIA_RPC_URL}"
+
 [etherscan]
 sepolia = {key = "${ETHERSCAN_API_KEY}", chain = 11155111}

@@ -2,30 +2,9 @@ import {readFileSync} from "node:fs";
 import {join} from "node:path";
 import {describe, expect, it} from "vitest";
 import {fromRoot} from "../src/paths";
+import {PORTABLE_MODULES} from "../src/portable";
 
-/**
- * The claim page imports these modules into the browser. They, and everything they
- * import, must stay free of Node built-ins and native packages.
- */
-const SHARED = [
-  "assets",
-  "collection",
-  "compatibility",
-  "composite",
-  "config",
-  "layers",
-  "metadata",
-  "morphology",
-  "random",
-  "seed",
-  "sha256",
-  "strokeFont",
-  "token",
-  "traits",
-  "types",
-  "weights",
-  "webAssets"
-];
+const SHARED: readonly string[] = PORTABLE_MODULES;
 
 const importsOf = (module: string): string[] =>
   [...readFileSync(join(fromRoot("src"), `${module}.ts`), "utf8").matchAll(/^import[^;]*?from "([^"]+)";/gms)].map((m) => m[1]!);

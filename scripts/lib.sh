@@ -15,7 +15,13 @@ use_network() {
 
 # load_env <network> <need-key: 0 or 1>
 #
-# Sets RPC_URL for the network and, when asked, a checked DEPLOYER_PRIVATE_KEY.
+# Sets RPC_URL and FORGE_RPC for the network and, when asked, a checked
+# DEPLOYER_PRIVATE_KEY.
+#
+# Nothing secret goes on a command line, where other processes can read it: cast
+# takes the endpoint from ETH_RPC_URL, forge takes Sepolia's through the `sepolia`
+# alias in foundry.toml, and forge reads the key and ETHERSCAN_API_KEY from the
+# environment.
 # .env fills in only what the environment has not already provided, so an explicit
 # `REQUIRE_ALLOWLIST=true scripts/deploy.sh sepolia`, or a local Anvil key, is never
 # silently replaced by whatever the file says.
@@ -38,10 +44,16 @@ load_env() {
 
   if [ "$network" = "sepolia" ]; then
     [ -n "${SEPOLIA_RPC_URL:-}" ] || die "SEPOLIA_RPC_URL is not set in .env"
+    export SEPOLIA_RPC_URL
     RPC_URL="$SEPOLIA_RPC_URL"
+    FORGE_RPC=sepolia
   else
     RPC_URL="${ANVIL_RPC_URL:-http://127.0.0.1:8545}"
+    export ANVIL_RPC_URL="$RPC_URL"
+    FORGE_RPC="$RPC_URL"
   fi
+  export ETH_RPC_URL="$RPC_URL"
+  if [ -n "${ETHERSCAN_API_KEY:-}" ]; then export ETHERSCAN_API_KEY; fi
 
   [ "$need_key" = 1 ] || return 0
   if [ "$network" = "sepolia" ]; then

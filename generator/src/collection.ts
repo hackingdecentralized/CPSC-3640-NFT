@@ -26,19 +26,28 @@ function canonical(value: unknown): unknown {
 }
 
 /**
- * A short digest of everything that decides which card a token gets and where its
- * layers go: the salt, the weights and rules, the layout, and (through their
- * SHA-256s) the base artwork. The claim page shows it, and `npm run collection
- * -- --expect` refuses a different one, so students are not shown one card and
- * sent another. Key order is ignored: every draw sorts its keys anyway.
+ * A digest of the configuration that decides which card a token gets and where its
+ * layers go: the salt, the weights and rules, the layout, and each template's weight
+ * and SHA-256. Display names are left out, since they never change a card, and so is
+ * key order, since every draw sorts its keys.
+ *
+ * The claim page computes this from the configuration it was built with, and checks it
+ * against the exported artwork. src/fingerprint.ts combines it with digests of the code
+ * and the artwork into the fingerprint the page shows.
  */
-export function collectionFingerprint(config: GeneratorConfig, collection: Collection): string {
+export function configDigest(config: GeneratorConfig, collection: Collection): string {
+  const templates = Object.fromEntries(
+    Object.entries(config.baseTemplates).map(([id, t]) => [id, {weight: t.weight, sha256: t.sha256}])
+  );
   const inputs = {
     salt: collection.salt,
-    baseTemplates: config.baseTemplates,
+    baseTemplates: templates,
     traits: config.traits,
     compatibility: config.compatibility,
     layout: config.layout
   };
-  return sha256Hex(JSON.stringify(canonical(inputs))).slice(0, 16);
+  return sha256Hex(JSON.stringify(canonical(inputs)));
 }
+
+/** The short fingerprint shown to people: several digests, folded into one. */
+export const combineDigests = (digests: readonly string[]): string => sha256Hex(digests.join(":")).slice(0, 16);

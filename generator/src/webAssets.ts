@@ -12,8 +12,10 @@ export const sampleFile = (template: string): string => `samples/${template}.web
 export interface WebIndex {
   /** Changes whenever any exported byte changes. Appended to URLs to bust caches. */
   version: string;
-  /** The collection the files were exported for. See collectionFingerprint. */
+  /** The collection fingerprint: configuration, code and artwork. See src/fingerprint.ts. */
   fingerprint: string;
+  /** The configuration the files were exported for. The page checks it against its own. */
+  configDigest: string;
   outputSize: number;
   /** Every layer key the page may ask for. */
   layers: string[];

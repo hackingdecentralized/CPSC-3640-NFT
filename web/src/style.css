@@ -128,6 +128,11 @@ button {
 button:hover:not(:disabled) { filter: brightness(1.08); }
 button:disabled { opacity: 0.55; cursor: not-allowed; }
 .primary { background: var(--amber); color: #2b1f08; font-weight: 650; }
+/* A button that reads as a link, for use inside running text. */
+.text-button {
+  display: inline; width: auto; padding: 0; border: 0; border-radius: 0;
+  background: none; color: var(--amber); font-size: inherit; text-decoration: underline;
+}
 .secondary { background: transparent; border-color: var(--line); color: var(--text); }
 
 /* ---- key/value rows ---- */

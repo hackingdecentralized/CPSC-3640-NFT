@@ -47,6 +47,8 @@ contract Deploy is Script {
 
         console.log("chain id       ", block.chainid);
         console.log("deployer       ", deployer);
+        console.log("balance (wei)  ", deployer.balance);
+        require(deployer.balance > 0, "Deploy: the deployer has no ETH on this network - fund it from a faucet first");
         console.log("owner          ", owner);
         console.log("claim open     ", claimOpen);
         console.log("allowlist      ", requireAllowlist ? "required" : "OFF - anyone may claim");

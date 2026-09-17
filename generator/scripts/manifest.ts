@@ -9,6 +9,8 @@ export interface CollectionManifest {
   contract: Address;
   /** Chain state was read at this block. */
   blockNumber: number;
+  /** How that block was chosen: finalized, safe, latest, or a number given by hand. */
+  blockTag: string;
   /** Tokens 1..count are in this collection. What `setBaseURI` must be given. */
   count: number;
   fingerprint: string;

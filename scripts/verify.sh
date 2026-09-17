@@ -21,6 +21,8 @@ _preset_scan="${ETHERSCAN_API_KEY:-}"
 [ -f .env ] && { set -a; . ./.env; set +a; }
 [ -n "$_preset_scan" ] && ETHERSCAN_API_KEY="$_preset_scan"
 [ -n "${ETHERSCAN_API_KEY:-}" ] || die "ETHERSCAN_API_KEY is not set in .env"
+# forge reads it from here, which keeps it off the command line.
+export ETHERSCAN_API_KEY
 
 read -r ADDRESS CHAIN_ID OWNER ROOT OPEN ALLOWLIST <<<"$(python3 -c "
 import json
@@ -46,6 +48,5 @@ echo "  allowlist  $ALLOWLIST"
 
 forge verify-contract "$ADDRESS" contracts/CPSC3640NFT.sol:CPSC3640NFT \
   --chain "$CHAIN_ID" \
-  --etherscan-api-key "$ETHERSCAN_API_KEY" \
   --constructor-args "$ARGS" \
   --watch

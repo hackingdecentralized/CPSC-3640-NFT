@@ -56,6 +56,12 @@ contract Reveal is Script {
     function _report(CPSC3640NFT nft) internal view {
         console.log("claim open     ", nft.claimOpen());
         console.log("total minted   ", nft.totalMinted());
+        // The first deployment has none of the reveal state, and reading it would
+        // revert, taking a plain open or close down with it.
+        if (!nft.supportsInterface(0x49064906)) {
+            console.log("reveal          not supported by this contract");
+            return;
+        }
         console.log("revealed count ", nft.revealedCount());
         console.log("base URI       ", nft.baseURI());
         console.log("frozen         ", nft.metadataFrozen());

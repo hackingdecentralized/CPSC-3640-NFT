@@ -19,7 +19,7 @@ import "./style.css";
 // The exact bytes the contract stores, so the preview cannot disagree with the token.
 import courseArtwork from "../../nft/course-nft-onchain.webp";
 
-import {FINGERPRINT, designs, drawCard, loadAssets, type Card, type Design} from "./card";
+import {designs, drawCard, loadAssets, type Card, type Design} from "./card";
 import {mountSlideshow, slideshowHtml} from "./slideshow";
 import {
   CHAIN_ID,
@@ -91,6 +91,8 @@ interface State {
   revealedCount?: bigint;
   /** Example cards for the six designs. `null` if the artwork could not be loaded. */
   designs?: Design[] | null;
+  /** The collection fingerprint of the artwork this page draws with. */
+  fingerprint?: string;
   /** The claimed token's card. */
   card?: CardView;
 }
@@ -110,6 +112,20 @@ const root = document.querySelector<HTMLElement>("#app")!;
 let state: State = {stage: "disconnected"};
 let pendingTimer: number | undefined;
 let countTimer: number | undefined;
+
+/**
+ * Bumped whenever the page starts working out a wallet's situation afresh. An async
+ * step that finds it changed while it waited drops its result: the page has moved
+ * on, perhaps to another wallet, and the old answer would be shown for the new one.
+ */
+let generation = 0;
+
+/**
+ * Whether this contract gives tokens generated cards. The contract says so once a
+ * wallet is connected; until then, the deployment record does. Records written
+ * before cards existed do not say, which means no.
+ */
+const revealable = (): boolean => state.revealable ?? DEPLOYMENT.revealable === true;
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -150,8 +166,8 @@ function setState(patch: Partial<State>): void {
  */
 function goto(stage: Stage, patch: Partial<State> = {}): void {
   window.clearTimeout(pendingTimer);
-  const {account, totalMinted, revealable, revealedCount} = state;
-  state = {stage, account, totalMinted, revealable, revealedCount, designs: state.designs, ...patch};
+  const {account, totalMinted, revealedCount, designs, fingerprint} = state;
+  state = {stage, account, totalMinted, revealable: state.revealable, revealedCount, designs, fingerprint, ...patch};
   render();
 }
 
@@ -374,8 +390,8 @@ function panel(): string {
             : !hasCard(token)
               ? "Metadata and artwork are stored entirely on-chain, your claim number included."
               : revealed
-                ? "Wallets and marketplaces now show this card."
-                : "For now your wallet shows the course placeholder. It switches to this card when the course staff publish the collection."
+                ? "Wallets and marketplaces now show your card."
+                : "For now your wallet shows the course placeholder. It switches to your card when the course staff publish the collection."
         )}
         <dl class="rows">
           <div><dt>Token</dt><dd class="mono">#${tokenId ?? "?"}</dd></div>
@@ -434,7 +450,7 @@ function artwork(): string {
       <figcaption>Rendered from <code>tokenURI(${token.tokenId})</code> on-chain</figcaption>
     </figure>`;
   }
-  if (state.revealable === false || state.designs === null) {
+  if (!revealable() || state.designs === null) {
     return `<figure class="card art">
       <img src="${courseArtwork}" alt="CPSC 3640/5400 course NFT artwork" />
       <figcaption>Preview &mdash; the same artwork the contract stores</figcaption>
@@ -456,6 +472,17 @@ function cardFigure(tokenId: bigint): string {
     </figure>`;
   }
   const view = state.card;
+  const placeholder = state.token?.placeholder;
+  if (view?.status === "failed" && placeholder) {
+    // Until the reveal, wallets show the on-chain artwork anyway, so show that.
+    return `<figure class="card art">
+      <img src="${placeholder.image}" alt="${escapeHtml(placeholder.name)}" />
+      <figcaption>
+        Your card could not be drawn right now, so this is the artwork your wallet shows.
+        <button type="button" class="text-button" id="redraw">Try again</button>
+      </figcaption>
+    </figure>`;
+  }
   const body =
     view?.status === "failed"
       ? `${statusBlock("bad", view.error.message, undefined, {detail: view.error.detail})}
@@ -475,7 +502,9 @@ function chainbar(): string {
       : `<div>Claimed so far <span>${state.totalMinted}</span></div>`;
   // Lets the course staff confirm the reveal reproduces the cards this page draws.
   const collection =
-    state.revealable === false ? "" : `<div>Collection <span class="mono">${FINGERPRINT}</span></div>`;
+    revealable() && state.fingerprint
+      ? `<div>Collection <span class="mono">${state.fingerprint}</span></div>`
+      : "";
 
   return `<div class="chainbar">
     <div>Network <span>${escapeHtml(NETWORK.label)}</span> (chain ${CHAIN_ID})</div>
@@ -599,7 +628,10 @@ async function switchNetwork(): Promise<void> {
  * it incrementally is what makes the already-claimed view survive a page reload.
  */
 async function refresh(): Promise<void> {
+  const run = ++generation;
+  const stale = () => run !== generation;
   const account = state.account ?? (await connectedAccount());
+  if (stale()) return;
   if (!account) {
     goto("disconnected");
     return;
@@ -609,6 +641,7 @@ async function refresh(): Promise<void> {
 
   try {
     const chainId = await currentChainId();
+    if (stale()) return;
     if (chainId !== CHAIN_ID) {
       goto("wrong-network", {account, wrongChainId: chainId});
       return;
@@ -618,13 +651,14 @@ async function refresh(): Promise<void> {
       readContractState(account),
       balanceOf(account)
     ]);
-    const {allowlistEnabled, totalMinted, revealable, revealedCount} = contractState;
+    if (stale()) return;
+    const {allowlistEnabled, totalMinted, revealedCount} = contractState;
     // Facts about the contract, kept across stages by `goto`.
-    state = {...state, totalMinted, revealable, revealedCount};
+    state = {...state, totalMinted, revealable: contractState.revealable, revealedCount};
 
     // Already claimed in this or an earlier session: rebuild the success view from chain state.
     if (contractState.hasClaimed) {
-      await showOwnedToken(account);
+      await showOwnedToken(account, run);
       return;
     }
 
@@ -639,19 +673,23 @@ async function refresh(): Promise<void> {
 
     if (allowlistEnabled) {
       const found = await proofFor(account);
+      if (stale()) return;
       if (!found) {
         goto("not-eligible", {account, allowlistEnabled});
         return;
       }
 
       // proofs.json says yes. Only the contract's answer decides whether we offer a button.
-      if (!(await isEligibleOnChain(account, found))) {
+      const eligible = await isEligibleOnChain(account, found);
+      if (stale()) return;
+      if (!eligible) {
         const root = await publishedRoot().catch(() => null);
-        const stale = root && root.toLowerCase() !== contractState.merkleRoot.toLowerCase();
+        if (stale()) return;
+        const outdated = root && root.toLowerCase() !== contractState.merkleRoot.toLowerCase();
         goto("not-eligible", {
           account,
           allowlistEnabled,
-          notice: stale
+          notice: outdated
             ? {
                 message: "This page is showing an out-of-date allowlist.",
                 detail: "The published Merkle root does not match the contract. Ask the course staff to rebuild the site."
@@ -684,6 +722,7 @@ async function refresh(): Promise<void> {
           : undefined
     });
   } catch (error) {
+    if (stale()) return;
     goto("disconnected", {
       account,
       notice: explain(error, "Could not reach the network. Check your connection and try again.")
@@ -691,19 +730,22 @@ async function refresh(): Promise<void> {
   }
 }
 
-async function showOwnedToken(account: Address, txHash?: Hex): Promise<void> {
+async function showOwnedToken(account: Address, run: number): Promise<void> {
+  const stale = () => run !== generation;
   try {
     const found = await findClaimedTokenId(account);
+    if (stale()) return;
     if (!found) {
-      goto("claimed", {account, txHash});
+      goto("claimed", {account});
       return;
     }
     const token = await readToken(found.tokenId, state.revealable ?? false);
-    showClaimed({account, token, txHash: txHash ?? found.transactionHash});
+    if (stale()) return;
+    showClaimed({account, token, txHash: found.transactionHash});
   } catch (error) {
+    if (stale()) return;
     goto("claimed", {
       account,
-      txHash,
       notice: explain(error, "You own the NFT, but its artwork could not be loaded right now.")
     });
   }
@@ -725,13 +767,16 @@ async function showCard(): Promise<void> {
   const token = state.token;
   if (state.stage !== "claimed" || !hasCard(token)) return;
   const {tokenId, claimer} = token;
-  const current = () => state.stage === "claimed" && state.token?.tokenId === tokenId;
+  const run = generation;
+  const current = () => run === generation && state.stage === "claimed" && state.token?.tokenId === tokenId;
 
   setState({card: {status: "drawing", tokenId}});
   try {
     const card = await drawCard(tokenId, claimer);
     cards.set(cardKey(tokenId, claimer), card);
     if (current()) setState({card: {status: "ready", card}});
+    // The artwork is reachable after all, so pick up what failed to load with it.
+    if (!state.fingerprint) loadDesigns();
   } catch (error) {
     if (current()) {
       setState({card: {status: "failed", tokenId, error: explain(error, "Your card could not be drawn right now.")}});
@@ -742,6 +787,7 @@ async function showCard(): Promise<void> {
 async function claim(): Promise<void> {
   const {account, proof} = state;
   if (!account || !proof) return;
+  const sameWallet = () => state.account?.toLowerCase() === account.toLowerCase();
 
   goto("awaiting-signature", {account, proof});
 
@@ -749,14 +795,17 @@ async function claim(): Promise<void> {
   try {
     hash = await submitClaim(account, proof, walletClient(account));
   } catch (error) {
-    goto("eligible", {
-      account,
-      proof,
-      totalMinted: state.totalMinted,
-      notice: explain(error, "The claim could not be submitted.")
-    });
+    // Cancel, or a switch to another wallet, has already moved the page on.
+    if (state.stage !== "awaiting-signature" || !sameWallet()) return;
+    goto("eligible", {account, proof, notice: explain(error, "The claim could not be submitted.")});
     return;
   }
+
+  // The claim is sent. Unless the page has moved to another wallet meanwhile, it is the
+  // newest thing the page knows, and it supersedes any check still running from Cancel.
+  if (!sameWallet()) return;
+  const run = ++generation;
+  const stale = () => run !== generation;
 
   goto("pending", {account, proof, txHash: hash});
   // "Transaction remains pending" is a state the page has to be honest about.
@@ -767,16 +816,13 @@ async function claim(): Promise<void> {
   try {
     const tokenId = await waitForClaim(hash);
     const token = await readToken(tokenId, state.revealable ?? false);
+    if (stale()) return;
     // This claim is the newest, so the count is at least this token's number.
     if (state.totalMinted === undefined || state.totalMinted < tokenId) state = {...state, totalMinted: tokenId};
     showClaimed({account, token, txHash: hash});
   } catch (error) {
-    goto("eligible", {
-      account,
-      proof,
-      totalMinted: state.totalMinted,
-      notice: explain(error, "The transaction did not complete successfully.")
-    });
+    if (stale()) return;
+    goto("eligible", {account, proof, notice: explain(error, "The transaction did not complete successfully.")});
   }
 }
 
@@ -833,14 +879,18 @@ function stopCountPolling(): void {
 // Boot
 // ---------------------------------------------------------------------------
 
-async function boot(): Promise<void> {
-  // The example cards need no wallet, so they load first, for everyone.
+function loadDesigns(): void {
   loadAssets()
-    .then((index) => setState({designs: designs(index)}))
+    .then((index) => setState({designs: designs(index), fingerprint: index.fingerprint}))
     .catch((error: unknown) => {
       console.error("card artwork unavailable; showing the on-chain artwork instead", error);
       setState({designs: null});
     });
+}
+
+async function boot(): Promise<void> {
+  // The example cards need no wallet, so they load first, for everyone.
+  loadDesigns();
 
   if (!hasWallet()) {
     goto("no-wallet");
@@ -858,7 +908,7 @@ async function boot(): Promise<void> {
   startCountPolling();
 
   onWalletChange(() => {
-    state = {stage: state.stage, designs: state.designs};
+    state = {stage: state.stage, designs: state.designs, fingerprint: state.fingerprint};
     void refresh();
   });
 

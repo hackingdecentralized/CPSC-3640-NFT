@@ -14,7 +14,7 @@ import collectionFile from "../../generator/config/collection.json";
 import compatibility from "../../generator/config/compatibility.json";
 import layout from "../../generator/config/layout.json";
 import traits from "../../generator/config/traits.json";
-import {collectionFingerprint, readCollection} from "../../generator/src/collection";
+import {configDigest, readCollection} from "../../generator/src/collection";
 import {allowedDistribution} from "../../generator/src/compatibility";
 import {buildConfig} from "../../generator/src/config";
 import {layerStack} from "../../generator/src/layers";
@@ -26,8 +26,8 @@ import {WEB_INDEX, layerFile, type WebIndex} from "../../generator/src/webAssets
 const CONFIG = buildConfig({baseTemplates, traits, compatibility, layout});
 const COLLECTION = readCollection(collectionFile);
 
-/** Shown at the foot of the page. `npm run collection -- --expect` checks it. */
-export const FINGERPRINT = collectionFingerprint(CONFIG, COLLECTION);
+/** What the exported artwork must have been made for. */
+const CONFIG_DIGEST = configDigest(CONFIG, COLLECTION);
 
 const ASSETS = `${import.meta.env.BASE_URL}nft/`;
 
@@ -69,8 +69,8 @@ export function loadAssets(): Promise<WebIndex> {
         throw new Error("the card artwork was not published with this page (run `npm run export-web` in generator/)");
       }
       const index = (await response.json()) as WebIndex;
-      if (index.fingerprint !== FINGERPRINT) {
-        throw new Error(`card artwork is for collection ${index.fingerprint}, this page is ${FINGERPRINT}. Re-export and rebuild.`);
+      if (index.configDigest !== CONFIG_DIGEST) {
+        throw new Error("the card artwork was exported for a different configuration (re-export, then rebuild)");
       }
       return index;
     })();

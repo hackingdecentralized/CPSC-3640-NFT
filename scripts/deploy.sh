@@ -25,8 +25,6 @@ use_network "$NETWORK"
 # 1. Secrets ------------------------------------------------------------------
 load_env "$NETWORK" 1
 
-DEPLOYER_ADDRESS="$(cast wallet address --private-key "$DEPLOYER_PRIVATE_KEY")"
-
 if [ "$VERIFY" -eq 1 ] && [ -z "${ETHERSCAN_API_KEY:-}" ]; then
   warn "ETHERSCAN_API_KEY is not set, so the source will not be verified."
   warn "Add it to .env and re-run scripts/verify.sh $NETWORK afterwards."
@@ -34,13 +32,8 @@ if [ "$VERIFY" -eq 1 ] && [ -z "${ETHERSCAN_API_KEY:-}" ]; then
 fi
 
 # 2. Refuse to ship code that does not pass its tests -------------------------
-say "Deployer $DEPLOYER_ADDRESS"
-BALANCE="$(cast balance "$DEPLOYER_ADDRESS" --rpc-url "$RPC_URL" 2>/dev/null || echo 0)"
-echo "    balance: $(cast from-wei "$BALANCE") ETH"
-if [ "$BALANCE" = "0" ]; then
-  die "deployer has no ETH on $NETWORK. Fund it from a Sepolia faucet first."
-fi
-
+# Deploy.s.sol prints the deployer and refuses an unfunded one before anything is
+# sent. Working the address out here would put the key on a command line.
 say "Running contract tests"
 forge test >/dev/null || die "tests failed - not deploying"
 
@@ -79,11 +72,12 @@ fi
 
 # 4. Deploy, verifying as part of the same run --------------------------------
 say "Deploying to $NETWORK"
-set -- forge script script/Deploy.s.sol --rpc-url "$RPC_URL" --broadcast
+set -- forge script script/Deploy.s.sol --rpc-url "$FORGE_RPC" --broadcast
 if [ "$VERIFY" -eq 1 ]; then
   # --verify submits the source once the creation transaction is mined, so a
-  # successful run leaves a verified contract with no second step.
-  set -- "$@" --verify --chain "$CHAIN_ID" --etherscan-api-key "$ETHERSCAN_API_KEY"
+  # successful run leaves a verified contract with no second step. forge reads
+  # ETHERSCAN_API_KEY from the environment.
+  set -- "$@" --verify --chain "$CHAIN_ID"
 fi
 
 if "$@"; then
@@ -115,4 +109,6 @@ Next:
   git add deployments/$NETWORK.json && git commit -m "Record $NETWORK deployment"
   scripts/publish-pages.sh
 DONE
-[ "$VERIFY" -eq 1 ] && echo "Source verification was submitted as part of the deploy."
+if [ "$VERIFY" -eq 1 ]; then
+  echo "Source verification was submitted as part of the deploy."
+fi

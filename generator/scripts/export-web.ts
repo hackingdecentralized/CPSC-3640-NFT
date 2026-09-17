@@ -15,7 +15,7 @@ import {createHash} from "node:crypto";
 import {existsSync, mkdirSync, readdirSync, rmSync, writeFileSync} from "node:fs";
 import {dirname, join, relative, resolve} from "node:path";
 import sharp from "sharp";
-import {collectionFingerprint} from "../src/collection";
+import {collectionFingerprint} from "../src/fingerprint";
 import {everyLayer} from "../src/layers";
 import {loadCollection, loadConfig} from "../src/loadConfig";
 import {fromRoot} from "../src/paths";
@@ -81,9 +81,11 @@ run(async () => {
     samples[template] = sampleFile(template);
   }
 
+  const {fingerprint, configDigest} = await collectionFingerprint(config, collection);
   const index: WebIndex = {
     version: hash.digest("hex").slice(0, 12),
-    fingerprint: collectionFingerprint(config, collection),
+    fingerprint,
+    configDigest,
     outputSize: config.layout.outputSize,
     layers: layers.map((layer) => layer.key),
     samples
