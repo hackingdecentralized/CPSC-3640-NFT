@@ -75,6 +75,7 @@ interface State {
   proof?: Hex[];
   txHash?: Hex;
   token?: OwnedToken;
+  artworkLoading?: boolean;
   /** Tokens minted so far. Token ids are claim order, so this is the queue length. */
   totalMinted?: bigint;
   /** False when the contract lets anyone claim, so the panel can say so. */
@@ -359,7 +360,7 @@ function panel(): string {
         ${statusBlock(
           stillHeld ? "good" : "info",
           tokenId === undefined
-            ? "This wallet owns the course NFT"
+            ? "This wallet has already claimed its course NFT"
             : `You were the ${ordinal(tokenId)} to claim`,
           !stillHeld
             ? "This token has since been transferred to another address. The claim record is permanent either way."
@@ -376,7 +377,7 @@ function panel(): string {
                   state.totalMinted ? ` of ${state.totalMinted} so far` : ""
                 }</dd></div>`
           }
-          <div><dt>Owner</dt><dd class="mono">${shorten(holder ?? state.account ?? "")}</dd></div>
+          <div><dt>Owner</dt><dd class="mono">${holder ? shorten(holder) : "Unavailable"}</dd></div>
         </dl>
         ${card ? traitList(card) : ""}
         ${tokenId !== undefined ? `<details class="wallet-import"><summary>Show in my wallet</summary>
@@ -414,9 +415,12 @@ function artwork(): string {
       <img src="${card.image}" alt="${escapeHtml(card.name)}" width="1254" height="1254" />
       <figcaption>Your NFT image, read directly from the contract</figcaption>
     </figure>`;
-    return `<figure class="card art"><div class="pending-card stack">
-      ${statusBlock("warn", state.token?.artworkError ?? "Your NFT is claimed. Reload its image to view it here.")}
-      <button class="secondary" id="redraw">Reload image</button>
+    const loading = state.artworkLoading === true;
+    return `<figure class="card art"><div class="pending-card stack" aria-busy="${loading}">
+      ${loading
+        ? statusBlock("info", "Loading your NFT image...", undefined, {spinner: true})
+        : statusBlock("warn", state.token?.artworkError ?? "Your NFT is claimed. Reload its image to view it here.")}
+      <button class="secondary" id="redraw" ${loading ? "disabled" : ""}>${loading ? "Loading..." : "Reload image"}</button>
     </div></figure>`;
   }
   if (DEPLOYMENT.onchainCards) {
@@ -497,7 +501,7 @@ const ACTIONS: Record<string, () => void> = {
   switch: () => void switchNetwork(),
   claim: () => void claim(),
   cancel: () => void refresh(),
-  redraw: () => void refresh(),
+  redraw: () => void reloadArtwork(),
   "copy-contract": () => { if (CONTRACT_ADDRESS) void navigator.clipboard.writeText(CONTRACT_ADDRESS).catch(() => {}); }
 };
 
@@ -661,23 +665,31 @@ async function refresh(): Promise<void> {
 
 async function showOwnedToken(account: Address, run: number): Promise<void> {
   const stale = () => run !== generation;
+  // Keep a token learned from a receipt or earlier lookup, even if a later read
+  // fails. Reloading an image should never redo eligibility or claim discovery.
+  goto("claimed", {account, token: state.token, txHash: state.txHash, artworkLoading: true});
   try {
-    const found = await findClaimedTokenId(account);
+    const tokenId = state.token?.tokenId ?? await findClaimedTokenId(account, state.totalMinted);
     if (stale()) return;
-    if (!found) {
-      goto("claimed", {account});
-      return;
+    if (tokenId === null) {
+      throw new Error("The claim is confirmed, but its token could not be found. Please retry.");
     }
-    const token = await readToken(found.tokenId);
+    setState({token: state.token ?? {tokenId}});
+    const token = await readToken(tokenId);
     if (stale()) return;
-    goto("claimed", {account, token, txHash: found.transactionHash});
+    setState({token, artworkLoading: false});
   } catch (error) {
     if (stale()) return;
-    goto("claimed", {
-      account,
-      notice: explain(error, "You own the NFT, but its artwork could not be loaded right now.")
+    setState({
+      artworkLoading: false,
+      notice: explain(error, "Your NFT is claimed, but its image could not be loaded right now. Please retry.")
     });
   }
+}
+
+async function reloadArtwork(): Promise<void> {
+  if (state.stage !== "claimed" || !state.account || state.artworkLoading) return;
+  await showOwnedToken(state.account, ++generation);
 }
 
 async function claim(): Promise<void> {
@@ -715,12 +727,7 @@ async function claim(): Promise<void> {
     // This claim is the newest, so the count is at least this token's number.
     if (state.totalMinted === undefined || state.totalMinted < tokenId) state = {...state, totalMinted: tokenId};
     goto("claimed", {account, txHash: hash, token: {tokenId, owner: account}});
-    try {
-      const token = await readToken(tokenId);
-      if (!stale()) goto("claimed", {account, token, txHash: hash});
-    } catch (error) {
-      if (!stale()) setState({notice: explain(error, "Your NFT was claimed, but its image could not be loaded. Reload the image to try again.")});
-    }
+    await showOwnedToken(account, run);
   } catch (error) {
     if (stale()) return;
     goto("eligible", {account, proof, notice: explain(error, "The transaction did not complete successfully.")});

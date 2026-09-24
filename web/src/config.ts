@@ -19,7 +19,7 @@ export interface Deployment {
   chainId: number;
   /** `null` until the contract has actually been deployed to this network. */
   contractAddress: string | null;
-  /** Block the contract was created in. Bounds the `Claimed` log query. */
+  /** Block the contract was created in, retained with the deployment record. */
   deploymentBlock: number;
   transactionHash: string | null;
   merkleRoot: string | null;

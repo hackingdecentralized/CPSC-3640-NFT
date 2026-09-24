@@ -9,15 +9,15 @@ import {
   createPublicClient,
   custom,
   decodeEventLog,
-  parseAbiItem,
   type Address,
   type Hex,
   type PublicClient
 } from "viem";
-import {CHAIN, CONTRACT_ADDRESS, DEPLOYMENT} from "./config";
+import {CHAIN, CONTRACT_ADDRESS} from "./config";
 import {CPSC3640NFT_ABI} from "./abi";
 import {getProvider} from "./wallet";
 import {decodeMetadata} from "./metadata";
+import {findOriginalClaim} from "./claimed-token";
 import type {Card} from "./card";
 
 export interface ContractState {
@@ -32,15 +32,10 @@ export interface ContractState {
 export interface OwnedToken {
   tokenId: bigint;
   /** Current holder. Not necessarily the claimer: these tokens are transferable. */
-  owner: Address;
+  owner?: Address;
   card?: Card;
   artworkError?: string;
 }
-
-/** Typed separately from the ABI so `getLogs` can infer `args.tokenId`. */
-const CLAIMED_EVENT = parseAbiItem(
-  "event Claimed(address indexed account, uint256 indexed tokenId)"
-);
 
 function contractAddress(): Address {
   if (!CONTRACT_ADDRESS) {
@@ -126,31 +121,27 @@ export async function waitForClaim(hash: Hex): Promise<bigint> {
 /**
  * Find the token a wallet claimed in some earlier session.
  *
- * `Claimed` indexes `account`, and the search starts at the deployment block rather
- * than at genesis, which keeps this within the range limits public RPCs impose.
+ * Reading claimerOf avoids eth_getLogs block-range limits, which can be as small
+ * as ten blocks on a free RPC plan. This course collection has a small supply.
  */
 export async function findClaimedTokenId(
-  account: Address
-): Promise<{tokenId: bigint; transactionHash: Hex} | null> {
-  const logs = await publicClient().getLogs({
-    address: contractAddress(),
-    event: CLAIMED_EVENT,
-    args: {account},
-    fromBlock: BigInt(DEPLOYMENT.deploymentBlock),
-    toBlock: "latest"
-  });
-
-  const last = logs.at(-1);
-  if (!last?.args.tokenId) return null;
-
-  return {tokenId: last.args.tokenId, transactionHash: last.transactionHash};
+  account: Address,
+  totalMinted?: bigint
+): Promise<bigint | null> {
+  const client = publicClient();
+  const base = {address: contractAddress(), abi: CPSC3640NFT_ABI} as const;
+  return findOriginalClaim(account, totalMinted ?? await readTotalMinted(), tokenId =>
+    client.readContract({...base, functionName: "claimerOf", args: [tokenId]}));
 }
 
 /** Read exactly the image a wallet receives. Media errors never undo a claim. */
 export async function readToken(tokenId: bigint): Promise<OwnedToken> {
   const base = {address: contractAddress(), abi: CPSC3640NFT_ABI} as const;
   const [owner, result] = await Promise.all([
-    ownerOf(tokenId),
+    ownerOf(tokenId).catch(error => {
+      console.error("NFT owner unavailable", error);
+      return undefined;
+    }),
     publicClient().readContract({...base, functionName: "tokenURI", args: [tokenId]})
       .then(uri => ({uri}), error => ({error}))
   ]);
