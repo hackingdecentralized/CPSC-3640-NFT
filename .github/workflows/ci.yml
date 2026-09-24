@@ -1,8 +1,7 @@
 # Tests and build only. This workflow deliberately does NOT deploy.
 #
 # Publishing to gh-pages happens from a developer machine via
-# `scripts/publish-pages.sh`. See "GitHub Pages and CI" in the README for why a
-# workflow that pushes gh-pages with GITHUB_TOKEN is not what you want here.
+# `scripts/publish-pages.sh`; gh-pages contains generated output only.
 name: CI
 
 on:
@@ -35,10 +34,11 @@ jobs:
       - name: Fail if the fixture is out of date
         run: git diff --exit-code allowlist/generated/example-tree.json
 
-      - name: Check the embedded artwork matches nft/course-nft-onchain.webp
+      - name: Verify committed on-chain cards
         run: |
-          npm run embed:image
-          git diff --exit-code contracts/CourseArtwork.sol
+          npm --prefix generator ci
+          npm run image
+          git diff --exit-code nft/cards
 
       - name: Run tests
         run: forge test -vv
@@ -62,53 +62,8 @@ jobs:
       - name: Generate proofs
         run: npm run merkle -- --example
 
-      - name: Export the card layers the page draws with
-        run: |
-          npm --prefix generator ci
-          npm --prefix generator run prepare-assets
-          npm --prefix generator run export-web
+      - name: Test metadata decoding
+        run: npm run test:web
 
       - name: Build the claim page
         run: npm --prefix web ci && npm --prefix web run build
-
-      - name: Fail if the build cannot draw cards
-        run: test -f web/dist/nft/index.json
-
-  generator:
-    name: NFT generator
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: generator
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install
-        run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Fail if the committed overlays are out of date
-        run: |
-          npm run build-overlays
-          git diff --exit-code assets/overlays
-
-      - name: Prepare assets
-        run: npm run prepare-assets
-
-      - name: Validate assets
-        run: npm run validate-assets
-
-      - name: Test, including pixel checks on real renders
-        run: npm test
-
-      - name: Rarity simulation
-        run: npm run rarity -- --count 10000
-
-      - name: Render a few previews
-        run: npm run preview -- --count 3

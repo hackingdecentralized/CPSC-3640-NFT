@@ -80,20 +80,6 @@ export const CPSC3640NFT_ABI = [
     outputs: [{name: "", type: "address"}]
   },
   {
-    type: "function",
-    name: "revealedCount",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{name: "", type: "uint256"}]
-  },
-  {
-    type: "function",
-    name: "supportsInterface",
-    stateMutability: "view",
-    inputs: [{name: "interfaceId", type: "bytes4"}],
-    outputs: [{name: "", type: "bool"}]
-  },
-  {
     type: "event",
     name: "Claimed",
     inputs: [

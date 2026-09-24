@@ -17,7 +17,8 @@
     "check-reveal": "tsx scripts/check-reveal.ts",
     "export-web": "tsx scripts/export-web.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepare-onchain": "node --import tsx scripts/prepare-onchain.ts"
   },
   "engines": {
     "node": ">=20"

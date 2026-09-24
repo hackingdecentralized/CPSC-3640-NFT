@@ -24,13 +24,10 @@ export interface Deployment {
   transactionHash: string | null;
   merkleRoot: string | null;
   deployer: string | null;
-  /**
-   * Whether this contract gives each token a generated card, recorded at deploy time.
-   * The page trusts the contract once a wallet is connected; this covers the moment
-   * before. Records from before cards existed do not have it, which means no.
-   */
-  revealable?: boolean | null;
+  /** True only for deployments of the immutable on-chain card contract. */
   onchainCards?: boolean;
+  /** Percentages from the renderer's deployment event; absent for equal-chance renderers. */
+  designWeights?: number[] | null;
 }
 
 export interface NetworkConfig {

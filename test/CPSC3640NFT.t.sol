@@ -2,8 +2,11 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {CourseArtwork} from "../contracts/CourseArtwork.sol";
+import {CourseRenderer} from "../contracts/CourseRenderer.sol";
 import {CPSC3640NFT} from "../contracts/CPSC3640NFT.sol";
 
 /// @dev Minimal Base64 decoder, used to prove `tokenURI` really carries decodable
@@ -21,8 +24,8 @@ library Base64Decode {
         bytes memory result = new bytes((data.length / 4) * 3 - padding);
         uint256 j;
         for (uint256 i = 0; i < data.length; i += 4) {
-            uint256 chunk = (_value(data[i]) << 18) | (_value(data[i + 1]) << 12)
-                | (_value(data[i + 2]) << 6) | _value(data[i + 3]);
+            uint256 chunk = (_value(data[i]) << 18) | (_value(data[i + 1]) << 12) | (_value(data[i + 2]) << 6)
+                | _value(data[i + 3]);
             if (j < result.length) result[j++] = bytes1(uint8(chunk >> 16));
             if (j < result.length) result[j++] = bytes1(uint8((chunk >> 8) & 0xFF));
             if (j < result.length) result[j++] = bytes1(uint8(chunk & 0xFF));
@@ -51,14 +54,12 @@ contract CPSC3640NFTTest is Test {
     event Claimed(address indexed account, uint256 indexed tokenId);
     event MerkleRootUpdated(bytes32 indexed previousRoot, bytes32 indexed newRoot);
     event ClaimOpenUpdated(bool isOpen);
-    event BaseURIUpdated(string baseURI, uint256 revealedCount);
-    event MetadataFrozen(string baseURI);
-    event BatchMetadataUpdate(uint256 _fromTokenId, uint256 _toTokenId);
 
     /// @dev Anvil account #2. Deliberately absent from addresses.example.json.
     address internal constant NOT_ALLOWLISTED = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC;
 
     CPSC3640NFT internal nft;
+    CourseRenderer internal renderer;
     address internal owner = makeAddr("owner");
 
     bytes32 internal merkleRoot;
@@ -81,7 +82,14 @@ contract CPSC3640NFTTest is Test {
             proofs.push(vm.parseJsonBytes32Array(json, string.concat(base, ".proof")));
         }
 
-        nft = new CPSC3640NFT(owner, merkleRoot, true, true);
+        address[6] memory images;
+        for (uint256 i; i < 6; i++) {
+            images[i] = address(
+                new CourseArtwork(vm.readFileBinary(string.concat("nft/cards/", vm.toString(i), ".jpg")))
+            );
+        }
+        renderer = new CourseRenderer(images);
+        nft = new CPSC3640NFT(owner, merkleRoot, true, true, renderer);
     }
 
     // -----------------------------------------------------------------------
@@ -176,7 +184,7 @@ contract CPSC3640NFTTest is Test {
     }
 
     function test_ClaimFailsWhenRootUnset() public {
-        CPSC3640NFT fresh = new CPSC3640NFT(owner, bytes32(0), true, true);
+        CPSC3640NFT fresh = new CPSC3640NFT(owner, bytes32(0), true, true, renderer);
 
         vm.prank(allowlisted[0]);
         vm.expectRevert(CPSC3640NFT.MerkleRootNotSet.selector);
@@ -214,10 +222,8 @@ contract CPSC3640NFTTest is Test {
     }
 
     // -----------------------------------------------------------------------
-    // Reveal
+    // Permanent claim identity
     // -----------------------------------------------------------------------
-
-    string internal constant CID_URI = "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi/";
 
     function _claimTwo() internal {
         vm.prank(allowlisted[0]);
@@ -242,211 +248,23 @@ contract CPSC3640NFTTest is Test {
         assertEq(nft.claimerOf(1), allowlisted[0], "the card belongs to whoever claimed it");
     }
 
-    string internal constant NEXT_URI = "ipfs://bafybeihkoviema7g3gxyt6la7vd5ho32ictqbilu3wnlo3rs7ewhnp7lly/";
-
-    function _placeholder(uint256 tokenId) internal view returns (bool) {
-        return _startsWith(nft.tokenURI(tokenId), "data:application/json;base64,");
-    }
-
-    function test_UnrevealedByDefault() public {
+    function test_MetadataIsCompleteImmediatelyAndSurvivesTransfer() public {
         _claimTwo();
-        assertEq(nft.revealedCount(), 0);
-        assertEq(bytes(nft.baseURI()).length, 0);
-        assertTrue(_placeholder(1), "placeholder stays on-chain");
-    }
-
-    function test_OwnerRevealsTheCollection() public {
-        _claimTwo();
-
-        vm.expectEmit(false, false, false, true);
-        emit BaseURIUpdated(CID_URI, 2);
-        vm.expectEmit(false, false, false, true);
-        emit BatchMetadataUpdate(1, 2);
+        string memory before = nft.tokenURI(1);
+        assertTrue(_startsWith(before, "data:application/json;base64,"));
+        vm.prank(allowlisted[0]);
+        nft.transferFrom(allowlisted[0], makeAddr("friend"), 1);
+        assertEq(nft.tokenURI(1), before);
         vm.prank(owner);
-        nft.setBaseURI(CID_URI, 2);
-
-        assertEq(nft.revealedCount(), 2);
-        assertEq(nft.tokenURI(1), string.concat(CID_URI, "1.json"));
-        assertEq(nft.tokenURI(2), string.concat(CID_URI, "2.json"));
+        nft.setClaimOpen(false);
+        assertEq(nft.tokenURI(1), before);
     }
 
-    function test_TokensClaimedAfterARevealKeepThePlaceholder() public {
-        _claimTwo();
-        vm.prank(owner);
-        nft.setBaseURI(CID_URI, 2);
-
-        // Not in the uploaded collection, so it must not point into it.
-        vm.prank(allowlisted[2]);
-        nft.claim(proofs[2]);
-        assertTrue(_placeholder(3), "a later token is not in the uploaded directory");
-        assertEq(nft.tokenURI(2), string.concat(CID_URI, "2.json"));
-
-        // The next reveal covers it.
-        vm.prank(owner);
-        nft.setBaseURI(NEXT_URI, 3);
-        assertEq(nft.tokenURI(1), string.concat(NEXT_URI, "1.json"));
-        assertEq(nft.tokenURI(3), string.concat(NEXT_URI, "3.json"));
-    }
-
-    function test_ARevealCanCoverOnlyTheFirstTokens() public {
-        _claimTwo();
-        vm.prank(owner);
-        nft.setBaseURI(CID_URI, 1);
-        assertEq(nft.tokenURI(1), string.concat(CID_URI, "1.json"));
-        assertTrue(_placeholder(2));
-    }
-
-    function test_RejectsARevealThatDoesNotMatchTheMintedTokens() public {
-        vm.startPrank(owner);
-        vm.expectRevert(CPSC3640NFT.InvalidReveal.selector);
-        nft.setBaseURI(CID_URI, 1); // nothing minted yet
-        vm.stopPrank();
-
-        _claimTwo();
-        vm.startPrank(owner);
-        vm.expectRevert(CPSC3640NFT.InvalidReveal.selector);
-        nft.setBaseURI(CID_URI, 3); // token 3 does not exist
-        vm.expectRevert(CPSC3640NFT.InvalidReveal.selector);
-        nft.setBaseURI(CID_URI, 0); // a location that covers nothing
-        vm.expectRevert(CPSC3640NFT.InvalidReveal.selector);
-        nft.setBaseURI("", 2); // tokens with nowhere to point
-        vm.stopPrank();
-        assertEq(nft.revealedCount(), 0);
-    }
-
-    function testFuzz_TokenURIFollowsRevealedCount(uint8 mintedSeed, uint8 countSeed) public {
-        uint256 minted = bound(mintedSeed, 1, 8);
-        uint256 count = bound(countSeed, 1, minted);
-        vm.prank(owner);
-        nft.setAllowlistEnabled(false);
-        for (uint256 i = 0; i < minted; i++) {
-            vm.prank(makeAddr(string.concat("student", vm.toString(i))));
-            nft.claim(new bytes32[](0));
-        }
-
-        vm.prank(owner);
-        nft.setBaseURI(CID_URI, count);
-        for (uint256 id = 1; id <= minted; id++) {
-            if (id <= count) assertEq(nft.tokenURI(id), string.concat(CID_URI, vm.toString(id), ".json"));
-            else assertTrue(_placeholder(id));
-        }
-    }
-
-    function test_RevealCanBeUndoneUntilFrozen() public {
-        _claimTwo();
-        vm.startPrank(owner);
-        nft.setBaseURI(CID_URI, 2);
-        nft.setBaseURI("", 0);
-        vm.stopPrank();
-        assertEq(nft.revealedCount(), 0);
-        assertTrue(_placeholder(1));
-    }
-
-    function test_UndoingWithNothingMintedEmitsNoBatchUpdate() public {
-        vm.recordLogs();
-        vm.prank(owner);
-        nft.setBaseURI("", 0);
-        assertEq(vm.getRecordedLogs().length, 1, "only BaseURIUpdated; there is no token range to refresh");
-    }
-
-    function test_NonOwnerCannotReveal() public {
-        _claimTwo();
-        address stranger = makeAddr("stranger");
-        vm.prank(stranger);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, stranger));
-        nft.setBaseURI("ipfs://hostile/", 1);
-    }
-
-    function test_FreezeMakesTheLocationPermanent() public {
-        _claimTwo();
-        vm.startPrank(owner);
-        nft.setBaseURI(CID_URI, 2);
-
-        vm.expectEmit(false, false, false, true);
-        emit MetadataFrozen(CID_URI);
-        nft.freezeMetadata();
-        assertTrue(nft.metadataFrozen());
-
-        vm.expectRevert(CPSC3640NFT.MetadataIsFrozen.selector);
-        nft.setBaseURI(NEXT_URI, 2);
-        vm.expectRevert(CPSC3640NFT.MetadataIsFrozen.selector);
-        nft.setBaseURI("", 0);
-        vm.stopPrank();
-
-        assertEq(nft.tokenURI(2), string.concat(CID_URI, "2.json"));
-    }
-
-    function test_FreezingClosesTheCollectionForGood() public {
-        _claimTwo();
-        vm.startPrank(owner);
-        nft.setBaseURI(CID_URI, 2);
-        nft.freezeMetadata();
-        assertFalse(nft.claimOpen(), "freezing ends claiming");
-
-        vm.expectRevert(CPSC3640NFT.MetadataIsFrozen.selector);
-        nft.setClaimOpen(true);
-        nft.setClaimOpen(false); // closing again is harmless
-        vm.stopPrank();
-
-        vm.prank(allowlisted[2]);
-        vm.expectRevert(CPSC3640NFT.ClaimClosed.selector);
-        nft.claim(proofs[2]);
-        assertEq(nft.totalMinted(), 2);
-    }
-
-    function test_CannotFreezeBeforeReveal() public {
-        vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(CPSC3640NFT.RevealIncomplete.selector, 0, 0));
-        nft.freezeMetadata();
-    }
-
-    function test_CannotFreezeWhileATokenIsUnrevealed() public {
-        _claimTwo();
-        vm.prank(owner);
-        nft.setBaseURI(CID_URI, 1);
-        vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(CPSC3640NFT.RevealIncomplete.selector, 1, 2));
-        nft.freezeMetadata();
-    }
-
-    function test_AClaimBetweenRevealAndFreezeBlocksTheFreeze() public {
-        _claimTwo();
-        vm.prank(owner);
-        nft.setBaseURI(CID_URI, 2);
-
-        vm.prank(allowlisted[2]);
-        nft.claim(proofs[2]);
-
-        vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(CPSC3640NFT.RevealIncomplete.selector, 2, 3));
-        nft.freezeMetadata();
-        assertFalse(nft.metadataFrozen());
-        assertTrue(nft.claimOpen());
-    }
-
-    function test_NonOwnerCannotFreeze() public {
-        _claimTwo();
-        vm.prank(owner);
-        nft.setBaseURI(CID_URI, 2);
-        address stranger = makeAddr("stranger");
-        vm.prank(stranger);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, stranger));
-        nft.freezeMetadata();
-    }
-
-    function test_NonexistentTokenStillRevertsAfterReveal() public {
-        _claimTwo();
-        vm.prank(owner);
-        nft.setBaseURI(CID_URI, 2);
-        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, 9));
-        nft.tokenURI(9);
-    }
-
-    function test_AdvertisesMetadataUpdatesAndERC721() public view {
-        assertTrue(nft.supportsInterface(0x49064906), "ERC-4906");
-        assertTrue(nft.supportsInterface(0x80ac58cd), "ERC-721");
-        assertTrue(nft.supportsInterface(0x5b5e139f), "ERC-721 metadata");
-        assertTrue(nft.supportsInterface(0x01ffc9a7), "ERC-165");
+    function test_AdvertisesERC721AndMetadata() public view {
+        assertTrue(nft.supportsInterface(0x80ac58cd));
+        assertTrue(nft.supportsInterface(0x5b5e139f));
+        assertTrue(nft.supportsInterface(0x01ffc9a7));
+        assertFalse(nft.supportsInterface(0x49064906));
         assertFalse(nft.supportsInterface(0xdeadbeef));
     }
 
@@ -459,19 +277,17 @@ contract CPSC3640NFTTest is Test {
 
         for (uint256 i = 0; i < foreign.length; i++) {
             vm.chainId(foreign[i]);
-            vm.expectRevert(
-                abi.encodeWithSelector(CPSC3640NFT.UnsupportedChain.selector, foreign[i])
-            );
-            new CPSC3640NFT(owner, merkleRoot, true, true);
+            vm.expectRevert(abi.encodeWithSelector(CPSC3640NFT.UnsupportedChain.selector, foreign[i]));
+            new CPSC3640NFT(owner, merkleRoot, true, true, renderer);
         }
     }
 
     function test_DeploysOnSepoliaAndLocal() public {
         vm.chainId(11155111);
-        assertEq(new CPSC3640NFT(owner, merkleRoot, true, true).owner(), owner, "Sepolia");
+        assertEq(new CPSC3640NFT(owner, merkleRoot, true, true, renderer).owner(), owner, "Sepolia");
 
         vm.chainId(31337);
-        assertEq(new CPSC3640NFT(owner, merkleRoot, true, true).owner(), owner, "local");
+        assertEq(new CPSC3640NFT(owner, merkleRoot, true, true, renderer).owner(), owner, "local");
     }
 
     // -----------------------------------------------------------------------
@@ -479,7 +295,7 @@ contract CPSC3640NFTTest is Test {
     // -----------------------------------------------------------------------
 
     function test_OpenClaimLetsAnyoneClaimOnce() public {
-        CPSC3640NFT open = new CPSC3640NFT(owner, bytes32(0), true, false);
+        CPSC3640NFT open = new CPSC3640NFT(owner, bytes32(0), true, false, renderer);
         bytes32[] memory none = new bytes32[](0);
 
         assertFalse(open.allowlistEnabled());
@@ -500,7 +316,7 @@ contract CPSC3640NFTTest is Test {
     }
 
     function test_OpenClaimIgnoresAnyProofSupplied() public {
-        CPSC3640NFT open = new CPSC3640NFT(owner, bytes32(0), true, false);
+        CPSC3640NFT open = new CPSC3640NFT(owner, bytes32(0), true, false, renderer);
 
         bytes32[] memory junk = new bytes32[](2);
         junk[0] = keccak256("nonsense");
@@ -549,7 +365,7 @@ contract CPSC3640NFTTest is Test {
     }
 
     function test_OpenClaimStillRespectsClaimClosed() public {
-        CPSC3640NFT open = new CPSC3640NFT(owner, bytes32(0), true, false);
+        CPSC3640NFT open = new CPSC3640NFT(owner, bytes32(0), true, false, renderer);
 
         vm.prank(owner);
         open.setClaimOpen(false);
@@ -560,7 +376,7 @@ contract CPSC3640NFTTest is Test {
     }
 
     function test_EligibilityViewsWhenOpen() public {
-        CPSC3640NFT open = new CPSC3640NFT(owner, bytes32(0), true, false);
+        CPSC3640NFT open = new CPSC3640NFT(owner, bytes32(0), true, false, renderer);
 
         assertTrue(open.canClaim(NOT_ALLOWLISTED));
         assertTrue(open.isEligible(NOT_ALLOWLISTED, new bytes32[](0)));
@@ -706,7 +522,7 @@ contract CPSC3640NFTTest is Test {
             string(Base64Decode.decode(_slice(image, bytes("data:image/svg+xml;base64,").length)));
 
         assertTrue(_startsWith(svg, "<svg"), "decoded image should be SVG markup");
-        assertTrue(_contains(svg, "data:image/webp;base64,"), "SVG should embed the WebP artwork");
+        assertTrue(_contains(svg, "data:image/jpeg;base64,"), "SVG should embed the JPEG artwork");
         assertTrue(_contains(svg, ">No. 1</text>"), "SVG should carry this token's claim number");
     }
 
@@ -739,24 +555,123 @@ contract CPSC3640NFTTest is Test {
         assertEq(vm.parseJsonUint(json, ".attributes[4].value"), 2);
     }
 
-    /// @notice The image compiled into the contract must match the file on disk.
-    /// @dev This is what stops the committed artwork and the on-chain copy from
-    ///      drifting. If it fails, run `npm run embed:image`.
-    function test_EmbeddedImageMatchesSourceFile() public view {
-        bytes memory file = vm.readFileBinary("nft/course-nft-onchain.webp");
-
-        assertEq(
-            keccak256(file),
-            keccak256(nft.rawImage()),
-            "nft/course-nft-onchain.webp and the embedded image differ - run `npm run embed:image`"
-        );
+    function test_AllSixImagesMatchCommittedBytesAndFitCodeLimit() public view {
+        string memory manifest = vm.readFile("nft/cards/manifest.json");
+        for (uint256 i; i < 6; i++) {
+            bytes memory file = vm.readFileBinary(string.concat("nft/cards/", vm.toString(i), ".jpg"));
+            assertEq(renderer.rawImage(i), file);
+            string memory digest =
+                vm.parseJsonString(manifest, string.concat(".cards[", vm.toString(i), "].sha256"));
+            assertEq(sha256(file), vm.parseBytes32(string.concat("0x", digest)));
+            assertLe(renderer.artwork(i).code.length, 24_576);
+        }
+        assertLe(address(renderer).code.length, 24_576);
     }
 
-    /// @notice The artwork must leave room for the contract under EIP-170.
-    function test_ArtworkStaysWithinBudget() public {
-        uint256 artwork = nft.rawImage().length;
-        emit log_named_uint("artwork bytes", artwork);
-        assertLt(artwork, 17_000, "artwork has outgrown its on-chain budget");
+    function testFuzz_TraitsUseOriginalAddressAndOrder(address account, uint128 order) public view {
+        CourseRenderer.Traits memory t = renderer.traits(order, account);
+        assertLt(t.design, 6);
+        assertLt(t.accent, 4);
+        assertLt(t.symbol, 3);
+        assertEq(abi.encode(t), abi.encode(renderer.traits(order, account)));
+    }
+
+    function test_DrawDependsOnBothAddressAndOrder() public view {
+        bytes32 first = keccak256(abi.encode(renderer.traits(1, allowlisted[0])));
+        bool addressChanged;
+        bool orderChanged;
+        for (uint256 i = 2; i < 20; i++) {
+            if (keccak256(abi.encode(renderer.traits(1, address(uint160(i))))) != first) {
+                addressChanged = true;
+            }
+            if (keccak256(abi.encode(renderer.traits(i, allowlisted[0]))) != first) orderChanged = true;
+        }
+        assertTrue(addressChanged);
+        assertTrue(orderChanged);
+    }
+
+    function test_DrawWeightsCoverAllOneHundredRolls() public view {
+        // Exercise the real address/order path for every bucket, including all
+        // boundaries. Counts are over buckets, not a flaky statistical sample.
+        bool[100] memory seen;
+        uint256[6] memory counts;
+        uint256 covered;
+        for (uint256 id = 1; id <= 5000 && covered < 100; id++) {
+            uint256 seed = uint256(keccak256(abi.encode("CPSC3640-onchain-v1", allowlisted[0], id)));
+            uint256 roll = seed % 100;
+            if (seen[roll]) continue;
+            seen[roll] = true;
+            covered++;
+            CourseRenderer.Traits memory t = renderer.traits(id, allowlisted[0]);
+            uint256 expected =
+                roll < 19 ? 0 : roll < 38 ? 1 : roll < 57 ? 2 : roll < 76 ? 3 : roll < 95 ? 4 : 5;
+            assertEq(t.design, expected, "wrong weighted card for roll");
+            counts[t.design]++;
+            assertEq(t.accent, (seed >> 64) % 4);
+            assertEq(t.symbol, (seed >> 128) % 3);
+            assertEq(t.orbit, (seed >> 192) % 2 == 1);
+        }
+        assertEq(covered, 100, "must cover every roll");
+        for (uint256 i; i < 5; i++) {
+            assertEq(counts[i], 19);
+        }
+        assertEq(counts[5], 5);
+    }
+
+    function test_DeploymentEmitsActualDesignWeights() public {
+        address[6] memory images;
+        for (uint256 i; i < 6; i++) {
+            images[i] = renderer.artwork(i);
+        }
+        vm.recordLogs();
+        CourseRenderer deployed = new CourseRenderer(images);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(logs.length, 1);
+        assertEq(logs[0].emitter, address(deployed));
+        assertEq(logs[0].topics[0], keccak256("DesignWeights(uint256[6])"));
+        uint256[6] memory weights = abi.decode(logs[0].data, (uint256[6]));
+        for (uint256 i; i < 5; i++) {
+            assertEq(weights[i], 19);
+        }
+        assertEq(weights[5], 5);
+    }
+
+    function test_AllDesignsRenderWithMatchingMetadataWithinReadBudget() public {
+        bool[6] memory checked;
+        uint256 count;
+        for (uint256 id = 1; id < 200 && count < 6; id++) {
+            CourseRenderer.Traits memory t = renderer.traits(id, allowlisted[0]);
+            if (checked[t.design]) continue;
+            checked[t.design] = true;
+            count++;
+            uint256 start = gasleft();
+            string memory uri = renderer.tokenURI(id, allowlisted[0]);
+            uint256 used = start - gasleft();
+            emit log_named_uint("tokenURI gas", used);
+            assertLt(used, 10_000_000);
+            string memory json = string(Base64Decode.decode(_slice(uri, 29)));
+            assertEq(vm.parseJsonString(json, ".attributes[5].value"), renderer.designName(t.design));
+            assertEq(vm.parseJsonString(json, ".attributes[6].value"), renderer.accentName(t.accent));
+            assertEq(vm.parseJsonString(json, ".attributes[7].value"), renderer.symbolName(t.symbol));
+            assertEq(vm.parseJsonString(json, ".image"), renderer.imageURI(id, allowlisted[0]));
+        }
+        assertEq(count, 6, "exercise every base card");
+    }
+
+    function test_RejectsMissingRenderer() public {
+        vm.expectRevert(CPSC3640NFT.InvalidRenderer.selector);
+        new CPSC3640NFT(owner, merkleRoot, true, true, CourseRenderer(address(0)));
+    }
+
+    function test_RejectsMissingArtwork() public {
+        address[6] memory images;
+        vm.expectRevert(abi.encodeWithSelector(CourseRenderer.InvalidArtwork.selector, 0));
+        new CourseRenderer(images);
+    }
+
+    function test_RejectsInvalidArtworkBytes() public {
+        vm.expectRevert(CourseArtwork.InvalidArtwork.selector);
+        new CourseArtwork(hex"1234");
     }
 
     // -----------------------------------------------------------------------
@@ -780,9 +695,7 @@ contract CPSC3640NFTTest is Test {
     function test_ThereIsNoPayableClaim() public {
         vm.deal(allowlisted[0], 1 ether);
         vm.prank(allowlisted[0]);
-        (bool ok,) = address(nft).call{value: 1 ether}(
-            abi.encodeWithSignature("claim(bytes32[])", proofs[0])
-        );
+        (bool ok,) = address(nft).call{value: 1 ether}(abi.encodeWithSignature("claim(bytes32[])", proofs[0]));
         assertFalse(ok, "claim must not accept ETH");
     }
 

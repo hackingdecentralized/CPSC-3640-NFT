@@ -1,4 +1,6 @@
 import {defineConfig} from "vite";
+import {rmSync} from "node:fs";
+import {fileURLToPath} from "node:url";
 
 /**
  * GitHub project pages are served from https://<user>.github.io/<repo>/, so the
@@ -11,6 +13,12 @@ import {defineConfig} from "vite";
  */
 export default defineConfig(({command}) => ({
   base: command === "build" ? (process.env.VITE_BASE ?? "/CPSC-3640-NFT/") : "/",
+  plugins: [{
+    name: "remove-unused-legacy-layers",
+    closeBundle() {
+      rmSync(fileURLToPath(new URL("./dist/nft", import.meta.url)), {recursive: true, force: true});
+    }
+  }],
   build: {
     outDir: "dist",
     emptyOutDir: true,

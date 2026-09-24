@@ -1,0 +1,42 @@
+{
+  "size": 512,
+  "quality": 60,
+  "cards": [
+    {
+      "index": 0,
+      "design": "harkness_tower",
+      "bytes": 18484,
+      "sha256": "518038d05add9e7fe34c9bc72d3786527b235a75bb3eaaad3538b2e3bafcfbcc"
+    },
+    {
+      "index": 1,
+      "design": "elm_tree",
+      "bytes": 22679,
+      "sha256": "966acb1f4e4756df438e0a4dc1f29487b43f8d54f668fe471f3596cc35449626"
+    },
+    {
+      "index": 2,
+      "design": "sterling_memorial_library",
+      "bytes": 20475,
+      "sha256": "bb4608c3e4ca9b543518086108fbb9441a61c24cf0d83ca94e0cdcd545e43c9a"
+    },
+    {
+      "index": 3,
+      "design": "beinecke_library",
+      "bytes": 20222,
+      "sha256": "a5e0d1b7c28dc3d8127dae0628a8bd3636b9802df718640224daa8c5119baabc"
+    },
+    {
+      "index": 4,
+      "design": "yale_shield",
+      "bytes": 19203,
+      "sha256": "e15cb53aa103f31ebdf591d6421f81e27ca7da3c8e5b34069bd330542ea0c428"
+    },
+    {
+      "index": 5,
+      "design": "handsome_dan",
+      "bytes": 18699,
+      "sha256": "e0824aca5173f48455dc02d67b29a535bfea8aad0eb54e753953e925da977d80"
+    }
+  ]
+}

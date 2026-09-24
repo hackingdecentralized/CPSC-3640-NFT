@@ -1,3 +1,9 @@
+> **Legacy layered generator.** The current NFT renders its final image on-chain.
+> These reveal/IPFS workflows describe the previous contract and are not used by
+> the current website or deployment. The only current preparation command here is
+> `npm run prepare-onchain`, which compresses the six source cards into `../nft/cards/`.
+> See the repository README for the current workflow.
+
 # Course NFT generator
 
 Deterministic image and metadata generation for the CPSC 3640 / CPSC 5400 Fall 2026

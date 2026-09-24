@@ -1,11 +1,20 @@
 {
   "network": "anvil",
   "chainId": 31337,
-  "contractAddress": null,
-  "deploymentBlock": 0,
-  "transactionHash": null,
-  "merkleRoot": null,
-  "deployer": null,
-  "constructorArgs": null,
-  "deployedAt": null
+  "contractAddress": "0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9",
+  "deploymentBlock": 4,
+  "transactionHash": "0xc8b350c1db95b3051caf0988af34810d8d66a0c49ab69300f3a254b7ef6f83c5",
+  "deployer": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+  "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "merkleRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "claimOpen": true,
+  "allowlistEnabled": false,
+  "revealable": true,
+  "constructorArgs": [
+    "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "true",
+    "false"
+  ],
+  "deployedAt": "2026-09-17T03:46:18.494Z"
 }

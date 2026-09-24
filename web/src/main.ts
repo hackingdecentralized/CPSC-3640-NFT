@@ -6,8 +6,7 @@
  * you see always matches what the page believes.
  *
  * Each token gets its own generated card. Before claiming, the page shows the six
- * designs a card can have. After claiming, it draws the student's card from their
- * token id and address (see card.ts), which is the card the token later reveals.
+ * designs a card can have. After claiming, it displays the image from tokenURI.
  *
  * Two rules shape the whole file:
  *   1. Eligibility is confirmed against the contract, never from proofs.json alone.
@@ -19,7 +18,7 @@ import "./style.css";
 // The exact bytes the contract stores, so the preview cannot disagree with the token.
 import courseArtwork from "../../nft/course-nft-onchain.webp";
 
-import {designs, drawCard, loadAssets, type Card, type Design} from "./card";
+import {designs, type Card} from "./card";
 import {mountSlideshow, slideshowHtml} from "./slideshow";
 import {
   CHAIN_ID,
@@ -38,7 +37,6 @@ import {
   findClaimedTokenId,
   isEligibleOnChain,
   readContractState,
-  readRevealedCount,
   readToken,
   readTotalMinted,
   submitClaim,
@@ -85,22 +83,7 @@ interface State {
   slow?: boolean;
   /** A recoverable problem, shown as a banner without discarding the current stage. */
   notice?: FriendlyError;
-  /** Whether this deployment gives each token a generated card. Unknown until first read. */
-  revealable?: boolean;
-  /** Tokens 1..revealedCount already show their card in wallets. */
-  revealedCount?: bigint;
-  /** Example cards for the six designs. `null` if the artwork could not be loaded. */
-  designs?: Design[] | null;
-  /** The collection fingerprint of the artwork this page draws with. */
-  fingerprint?: string;
-  /** The claimed token's card. */
-  card?: CardView;
 }
-
-type CardView =
-  | {status: "drawing"; tokenId: bigint}
-  | {status: "ready"; card: Card}
-  | {status: "failed"; tokenId: bigint; error: FriendlyError};
 
 /**
  * Enough native currency to be confident the claim will go through. A claim costs
@@ -119,13 +102,6 @@ let countTimer: number | undefined;
  * on, perhaps to another wallet, and the old answer would be shown for the new one.
  */
 let generation = 0;
-
-/**
- * Whether this contract gives tokens generated cards. The contract says so once a
- * wallet is connected; until then, the deployment record does. Records written
- * before cards existed do not say, which means no.
- */
-const revealable = (): boolean => state.revealable ?? DEPLOYMENT.revealable === true;
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -166,8 +142,8 @@ function setState(patch: Partial<State>): void {
  */
 function goto(stage: Stage, patch: Partial<State> = {}): void {
   window.clearTimeout(pendingTimer);
-  const {account, totalMinted, revealedCount, designs, fingerprint} = state;
-  state = {stage, account, totalMinted, revealable: state.revealable, revealedCount, designs, fingerprint, ...patch};
+  const {account, totalMinted} = state;
+  state = {stage, account, totalMinted, ...patch};
   render();
 }
 
@@ -342,13 +318,13 @@ function panel(): string {
     case "eligible": {
       const next = (state.totalMinted ?? 0n) + 1n;
       const who = state.allowlistEnabled === false ? "Open to anyone, one NFT per wallet." : "One NFT per wallet.";
-      const art = state.revealable
-        ? "Your card is drawn from your wallet address and your claim number."
+      const art = DEPLOYMENT.onchainCards
+        ? "Your address and final claim number determine your card. The number is assigned when the transaction is confirmed."
         : "Your claim number is minted into the artwork itself.";
       return `<h2>You are eligible</h2>
         ${walletRow()}
         ${noticeBlock()}
-        ${statusBlock("good", `You will be the ${ordinal(next)} to claim`, `${who} ${art}`)}
+        ${statusBlock("good", `Next available claim: ${ordinal(next)}`, `${who} ${art}`)}
         <button class="primary" id="claim">Claim Course NFT</button>`;
     }
 
@@ -375,7 +351,6 @@ function panel(): string {
       const holder = token?.owner;
       const stillHeld = !holder || !state.account || holder.toLowerCase() === state.account.toLowerCase();
       const card = readyCard();
-      const revealed = hasCard(token) && tokenId !== undefined && tokenId <= (state.revealedCount ?? 0n);
       const txLink = state.txHash ? explorerTx(state.txHash) : null;
       const contractLink = CONTRACT_ADDRESS ? explorerAddress(CONTRACT_ADDRESS) : null;
       return `<h2>NFT claimed!</h2>
@@ -388,11 +363,9 @@ function panel(): string {
             : `You were the ${ordinal(tokenId)} to claim`,
           !stillHeld
             ? "This token has since been transferred to another address. The claim record is permanent either way."
-            : !hasCard(token)
-              ? "Metadata and artwork are stored entirely on-chain, your claim number included."
-              : revealed
-                ? "Wallets and marketplaces now show your card."
-                : "For now your wallet shows the course placeholder. It switches to your card when the course staff publish the collection."
+            : DEPLOYMENT.onchainCards
+              ? "Your final card is stored on-chain and ready to view in your wallet."
+              : "This deployment uses the earlier artwork. The image below is what its contract currently returns."
         )}
         <dl class="rows">
           <div><dt>Token</dt><dd class="mono">#${tokenId ?? "?"}</dd></div>
@@ -406,6 +379,13 @@ function panel(): string {
           <div><dt>Owner</dt><dd class="mono">${shorten(holder ?? state.account ?? "")}</dd></div>
         </dl>
         ${card ? traitList(card) : ""}
+        ${tokenId !== undefined ? `<details class="wallet-import"><summary>Show in my wallet</summary>
+          <p>In your wallet, choose Import NFT on ${escapeHtml(NETWORK.label)}.</p>
+          <p>Contract: <span class="mono">${escapeHtml(CONTRACT_ADDRESS ?? "")}</span>
+            <button class="text-button" id="copy-contract">Copy</button></p>
+          <p>Token ID: <strong>${tokenId}</strong></p>
+          <p>Enable NFT media if the image is hidden. Detection and refresh times depend on your wallet.</p>
+        </details>` : ""}
         <div class="links">
           ${card ? `<a href="${card.image}" download="${escapeHtml(card.fileName)}">Download image</a>` : ""}
           ${txLink ? `<a href="${txLink}" target="_blank" rel="noopener noreferrer">View transaction</a>` : ""}
@@ -415,81 +395,35 @@ function panel(): string {
   }
 }
 
-/** Whether this token has a generated card: a reveal-capable contract recorded its claimer. */
-function hasCard(token: OwnedToken | undefined): token is OwnedToken & {claimer: Address} {
-  return Boolean(state.revealable && token?.claimer);
-}
-
 function readyCard(): Card | undefined {
-  const view = state.card;
-  return view?.status === "ready" && view.card.tokenId === state.token?.tokenId ? view.card : undefined;
+  return state.token?.card;
 }
 
-/** The card's traits, under the names its metadata uses. Rare values stand out. */
 function traitList(card: Card): string {
-  const items = card.traits
-    .map(
-      ({label, value, odds}) => `<div${odds !== undefined && odds <= 5 ? ' class="rare"' : ""}>
-        <dt>${escapeHtml(label)}</dt>
-        <dd>${escapeHtml(value)}${odds === undefined ? "" : ` <span>${odds}%</span>`}</dd>
-      </div>`
-    )
-    .join("");
-  return `<dl class="traits" aria-label="Card traits">${items}</dl>`;
+  const visible = new Set(["Base Template", "Accent", "Symbol", "Orbit"]);
+  const items = card.traits.filter(trait => visible.has(trait.label)).map(
+    ({label, value}) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`
+  ).join("");
+  return items ? `<dl class="traits" aria-label="Card traits">${items}</dl>` : "";
 }
 
-/**
- * Left column. Before claiming: the six designs a card can have. After: the student's
- * own card. A contract without generated cards shows its one on-chain artwork instead.
- */
 function artwork(): string {
-  const token = state.stage === "claimed" ? state.token : undefined;
-  if (token && hasCard(token)) return cardFigure(token.tokenId);
-  if (token?.placeholder) {
-    return `<figure class="card art">
-      <img src="${token.placeholder.image}" alt="${escapeHtml(token.placeholder.name)}" />
-      <figcaption>Rendered from <code>tokenURI(${token.tokenId})</code> on-chain</figcaption>
+  if (state.stage === "claimed") {
+    const card = readyCard();
+    if (card) return `<figure class="card art">
+      <img src="${card.image}" alt="${escapeHtml(card.name)}" width="1254" height="1254" />
+      <figcaption>Your NFT image, read directly from the contract</figcaption>
     </figure>`;
+    return `<figure class="card art"><div class="pending-card stack">
+      ${statusBlock("warn", state.token?.artworkError ?? "Your NFT is claimed. Reload its image to view it here.")}
+      <button class="secondary" id="redraw">Reload image</button>
+    </div></figure>`;
   }
-  if (!revealable() || state.designs === null) {
-    return `<figure class="card art">
-      <img src="${courseArtwork}" alt="CPSC 3640/5400 course NFT artwork" />
-      <figcaption>Preview &mdash; the same artwork the contract stores</figcaption>
-    </figure>`;
+  if (DEPLOYMENT.onchainCards) {
+    return `<figure class="card art">${slideshowHtml(designs, escapeHtml, DEPLOYMENT.designWeights)}</figure>`;
   }
-  return designsFigure();
-}
-
-function designsFigure(): string {
-  return `<figure class="card art">${slideshowHtml(state.designs ?? undefined, escapeHtml)}</figure>`;
-}
-
-function cardFigure(tokenId: bigint): string {
-  const card = readyCard();
-  if (card) {
-    return `<figure class="card art">
-      <img src="${card.image}" alt="${escapeHtml(card.name)}" width="1024" height="1024" />
-      <figcaption>Your card, drawn from token #${tokenId} and the wallet that claimed it</figcaption>
-    </figure>`;
-  }
-  const view = state.card;
-  const placeholder = state.token?.placeholder;
-  if (view?.status === "failed" && placeholder) {
-    // Until the reveal, wallets show the on-chain artwork anyway, so show that.
-    return `<figure class="card art">
-      <img src="${placeholder.image}" alt="${escapeHtml(placeholder.name)}" />
-      <figcaption>
-        Your card could not be drawn right now, so this is the artwork your wallet shows.
-        <button type="button" class="text-button" id="redraw">Try again</button>
-      </figcaption>
-    </figure>`;
-  }
-  const body =
-    view?.status === "failed"
-      ? `${statusBlock("bad", view.error.message, undefined, {detail: view.error.detail})}
-         <button class="secondary" id="redraw">Try again</button>`
-      : statusBlock("info", "Drawing your card...", undefined, {spinner: true});
-  return `<figure class="card art"><div class="pending-card stack">${body}</div></figure>`;
+  return `<figure class="card art"><img src="${courseArtwork}" alt="Course NFT artwork" />
+    <figcaption>Artwork from the currently configured deployment</figcaption></figure>`;
 }
 
 function chainbar(): string {
@@ -501,16 +435,9 @@ function chainbar(): string {
     state.totalMinted === undefined
       ? ""
       : `<div>Claimed so far <span>${state.totalMinted}</span></div>`;
-  // Lets the course staff confirm the reveal reproduces the cards this page draws.
-  const collection =
-    revealable() && state.fingerprint
-      ? `<div>Collection <span class="mono">${state.fingerprint}</span></div>`
-      : "";
-
   return `<div class="chainbar">
     <div>Network <span>${escapeHtml(NETWORK.label)}</span> (chain ${CHAIN_ID})</div>
     ${claimed}
-    ${collection}
     <div>Contract ${link ? `<a class="mono" href="${link}" target="_blank" rel="noopener noreferrer">${shorten(CONTRACT_ADDRESS!, 10, 8)}</a>` : address}</div>
   </div>`;
 }
@@ -570,7 +497,8 @@ const ACTIONS: Record<string, () => void> = {
   switch: () => void switchNetwork(),
   claim: () => void claim(),
   cancel: () => void refresh(),
-  redraw: () => void showCard()
+  redraw: () => void refresh(),
+  "copy-contract": () => { if (CONTRACT_ADDRESS) void navigator.clipboard.writeText(CONTRACT_ADDRESS).catch(() => {}); }
 };
 
 // A property rather than addEventListener: there is exactly one page handler.
@@ -653,9 +581,9 @@ async function refresh(): Promise<void> {
       balanceOf(account)
     ]);
     if (stale()) return;
-    const {allowlistEnabled, totalMinted, revealedCount} = contractState;
+    const {allowlistEnabled, totalMinted} = contractState;
     // Facts about the contract, kept across stages by `goto`.
-    state = {...state, totalMinted, revealable: contractState.revealable, revealedCount};
+    state = {...state, totalMinted};
 
     // Already claimed in this or an earlier session: rebuild the success view from chain state.
     if (contractState.hasClaimed) {
@@ -740,48 +668,15 @@ async function showOwnedToken(account: Address, run: number): Promise<void> {
       goto("claimed", {account});
       return;
     }
-    const token = await readToken(found.tokenId, state.revealable ?? false);
+    const token = await readToken(found.tokenId);
     if (stale()) return;
-    showClaimed({account, token, txHash: found.transactionHash});
+    goto("claimed", {account, token, txHash: found.transactionHash});
   } catch (error) {
     if (stale()) return;
     goto("claimed", {
       account,
       notice: explain(error, "You own the NFT, but its artwork could not be loaded right now.")
     });
-  }
-}
-
-/** Finished cards, so returning to the claimed view never shows the spinner twice. */
-const cards = new Map<string, Card>();
-const cardKey = (tokenId: bigint, claimer: Address) => `${tokenId}:${claimer.toLowerCase()}`;
-
-function showClaimed(patch: Partial<State>): void {
-  const token = patch.token;
-  const ready = token?.claimer ? cards.get(cardKey(token.tokenId, token.claimer)) : undefined;
-  goto("claimed", ready ? {...patch, card: {status: "ready", card: ready}} : patch);
-  if (!ready) void showCard();
-}
-
-/** Draw the claimed token's card, if it has one, and show it when done. */
-async function showCard(): Promise<void> {
-  const token = state.token;
-  if (state.stage !== "claimed" || !hasCard(token)) return;
-  const {tokenId, claimer} = token;
-  const run = generation;
-  const current = () => run === generation && state.stage === "claimed" && state.token?.tokenId === tokenId;
-
-  setState({card: {status: "drawing", tokenId}});
-  try {
-    const card = await drawCard(tokenId, claimer);
-    cards.set(cardKey(tokenId, claimer), card);
-    if (current()) setState({card: {status: "ready", card}});
-    // The artwork is reachable after all, so pick up what failed to load with it.
-    if (!state.fingerprint) loadDesigns();
-  } catch (error) {
-    if (current()) {
-      setState({card: {status: "failed", tokenId, error: explain(error, "Your card could not be drawn right now.")}});
-    }
   }
 }
 
@@ -816,11 +711,16 @@ async function claim(): Promise<void> {
 
   try {
     const tokenId = await waitForClaim(hash);
-    const token = await readToken(tokenId, state.revealable ?? false);
     if (stale()) return;
     // This claim is the newest, so the count is at least this token's number.
     if (state.totalMinted === undefined || state.totalMinted < tokenId) state = {...state, totalMinted: tokenId};
-    showClaimed({account, token, txHash: hash});
+    goto("claimed", {account, txHash: hash, token: {tokenId, owner: account}});
+    try {
+      const token = await readToken(tokenId);
+      if (!stale()) goto("claimed", {account, token, txHash: hash});
+    } catch (error) {
+      if (!stale()) setState({notice: explain(error, "Your NFT was claimed, but its image could not be loaded. Reload the image to try again.")});
+    }
   } catch (error) {
     if (stale()) return;
     goto("eligible", {account, proof, notice: explain(error, "The transaction did not complete successfully.")});
@@ -850,11 +750,6 @@ function startCountPolling(): void {
     try {
       const latest = await readTotalMinted();
       if (latest !== state.totalMinted) setState({totalMinted: latest});
-      // A student who stays on the page sees their card go live when it is published.
-      if (state.stage === "claimed" && state.revealable) {
-        const revealed = await readRevealedCount();
-        if (revealed !== state.revealedCount) setState({revealedCount: revealed});
-      }
     } catch (error) {
       // A transient RPC failure should not disturb the page. It will retry next tick.
       console.debug("claim count poll failed", error);
@@ -880,19 +775,7 @@ function stopCountPolling(): void {
 // Boot
 // ---------------------------------------------------------------------------
 
-function loadDesigns(): void {
-  loadAssets()
-    .then((index) => setState({designs: designs(index), fingerprint: index.fingerprint}))
-    .catch((error: unknown) => {
-      console.error("card artwork unavailable; showing the on-chain artwork instead", error);
-      setState({designs: null});
-    });
-}
-
 async function boot(): Promise<void> {
-  // The example cards need no wallet, so they load first, for everyone.
-  loadDesigns();
-
   if (!hasWallet()) {
     goto("no-wallet");
     return;
@@ -909,7 +792,7 @@ async function boot(): Promise<void> {
   startCountPolling();
 
   onWalletChange(() => {
-    state = {stage: state.stage, designs: state.designs, fingerprint: state.fingerprint};
+    state = {stage: state.stage};
     void refresh();
   });
 

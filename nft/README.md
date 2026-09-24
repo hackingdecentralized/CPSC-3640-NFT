@@ -1,82 +1,34 @@
-# Course NFT artwork
+# On-chain course cards
 
-Two files, and the difference between them matters.
+`cards/0.jpg` through `cards/5.jpg` are the exact image bytes deployed once as six
+immutable `CourseArtwork` contracts. `cards/manifest.json` records the order, names,
+size and SHA-256 digest of each image. The renderer uses that same order:
 
-| File | What it is |
-| --- | --- |
-| `course-nft.svg` | the master, 1254x1254, about 1.7 MB |
-| `course-nft-onchain.webp` | the derived 512x512 copy actually stored in the contract |
+0. Harkness Tower — 19%
+1. Elm Tree — 19%
+2. Sterling Memorial Library — 19%
+3. Beinecke Library — 19%
+4. Yale Shield — 19%
+5. Handsome Dan — 5%
 
-## Why there are two
+Each base is 512×512, JPEG quality 60, and under 24,575 bytes (one byte is reserved for
+STOP). Compression reduces detail compared with the originals. `CourseRenderer`
+embeds the selected bytes in an SVG and adds a colored frame, symbol, optional ring
+and claim number. The SVG and metadata are returned as self-contained Base64 data
+URIs. No image is uploaded after a claim.
 
-The whole point of this project is that the artwork lives in the contract, so a
-minted token stays valid with no IPFS pin and no web server. That puts the artwork
-under a hard ceiling: EIP-170 caps a contract's runtime bytecode at 24,576 bytes,
-and the contract logic already needs about 6.9 KB. The artwork gets roughly 17 KB.
-
-The master is about 1.7 MB, which is 73 times over that budget. Despite the `.svg`
-extension it is not vector art: it is a single 1254x1254 raster wrapped in an
-`<image>` element. So it cannot be shrunk by simplifying paths, only by
-re-encoding.
-
-Downscaling to 512x512 and encoding as WebP gets it to 14,292 bytes, which fits
-with about 3.4 KB of contract headroom to spare. At that size every line of course
-text is still legible.
-
-## Regenerating
-
-Only needed when the master changes.
+Regenerate before a new deployment:
 
 ```bash
-pip install pillow
-python3 scripts/make-onchain-image.py   # master -> course-nft-onchain.webp
-npm run embed:image                     # webp   -> contracts/CourseArtwork.sol
-forge test                              # proves the two still match
+npm --prefix generator ci
+npm run image
+forge test
 ```
 
-`scripts/make-onchain-image.py` refuses to write a file over the 17 KB budget, and
-`npm run embed:image` refuses to embed one, so an oversized artwork fails at your
-desk rather than at deployment. `test_EmbeddedImageMatchesSourceFile` re-reads the
-`.webp` at test time and fails if the Solidity copy has drifted from it, so
-forgetting to re-embed is caught by `forge test`.
+The script uses `generator/assets/source/`, never the already-compressed JPEGs.
+Contract tests read all six files and compare both their hashes and the deployed
+bytes. Existing deployed cards cannot be changed by regenerating these files.
 
-To trade resolution against quality, edit `SIZE` and `QUALITY` in
-`scripts/make-onchain-image.py`. For reference, at quality 65: 384px is about
-9.7 KB, 512px about 14.3 KB, and 576px runs over budget.
-
-## Per-token claim numbers
-
-The stored artwork is one fixed image, but every token's image is different.
-`imageURI(tokenId)` wraps the stored WebP in an SVG at read time and draws that
-token's claim number on it, so token 3 shows "No. 3". Token ids are assigned in
-`claim` order, so the number on the picture is literally where that student came
-in the queue.
-
-Nothing extra is stored per token. One image in bytecode, N distinct images out.
-Adding a student costs nothing, and the badge needs no upload, no pre-rendering
-and no roster known in advance. The number is also exposed as a sortable
-`Claim Number` attribute in the metadata.
-
-Costs about 5.1 million gas to read, which is free: `tokenURI` is a view function
-and this is well inside what public RPCs allow for `eth_call`.
-
-## What is in the picture
-
-A bulldog in a Yale bandana over the course's organising idea:
-
-```
-HUMAN  <->  BLOCKCHAIN / CONTRACT  <->  AI
-```
-
-with the course number, title, and term.
-
-## Two things to know
-
-**It is a raster, not vector.** The previous artwork was hand-drawn SVG and stayed
-crisp at any size. This one is fixed at 512x512 on-chain and will soften on a large
-display. That is the cost of using this illustration.
-
-**The bandana carries a Yale "Y".** The Yale seal does not appear and the metadata
-says plainly that this is a course collectible and not an academic credential, but
-the "Y" is a university trademark. Using it is a call for the course staff, not a
-technical question. Replace the master and regenerate if you would rather not.
+`course-nft.svg` and `course-nft-onchain.webp` are retained for the previous deployment.
+The frontend uses the older preview only when configured with an old deployment
+record. They are no longer embedded in new NFT contracts.

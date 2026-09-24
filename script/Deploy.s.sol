@@ -2,11 +2,13 @@
 pragma solidity ^0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
+import {CourseArtwork} from "../contracts/CourseArtwork.sol";
+import {CourseRenderer} from "../contracts/CourseRenderer.sol";
 import {CPSC3640NFT} from "../contracts/CPSC3640NFT.sol";
 
 /// @title Deploy CPSC3640NFT
-/// @notice Deploys the course NFT with the Merkle root produced by
-///         `allowlist/generate-merkle.ts`.
+/// @notice Deploys six immutable image stores, a renderer, and the course NFT.
+///         Optional Merkle proofs come from `allowlist/generate-merkle.ts`.
 ///
 /// @dev Reads from the environment (see `.env.example`):
 ///        DEPLOYER_PRIVATE_KEY  required, the broadcasting account
@@ -17,10 +19,11 @@ import {CPSC3640NFT} from "../contracts/CPSC3640NFT.sol";
 ///                              token. Set true to require a Merkle proof.
 ///
 ///      Local Anvil:
-///        forge script script/Deploy.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
+///        forge script script/Deploy.s.sol --rpc-url http://127.0.0.1:8545 --broadcast --slow
 ///
 ///      Sepolia:
-///        forge script script/Deploy.s.sol --rpc-url $SEPOLIA_RPC_URL --broadcast --verify
+///        scripts/deploy.sh sepolia
+///        scripts/deploy.sh sepolia --resume  # continue a partial deployment
 ///
 ///      Afterwards run `node scripts/save-deployment.mjs sepolia` to record the
 ///      address, block and transaction hash in deployments/sepolia.json.
@@ -48,14 +51,25 @@ contract Deploy is Script {
         console.log("chain id       ", block.chainid);
         console.log("deployer       ", deployer);
         console.log("balance (wei)  ", deployer.balance);
-        require(deployer.balance > 0, "Deploy: the deployer has no ETH on this network - fund it from a faucet first");
+        require(
+            deployer.balance > 0,
+            "Deploy: the deployer has no ETH on this network - fund it from a faucet first"
+        );
         console.log("owner          ", owner);
         console.log("claim open     ", claimOpen);
         console.log("allowlist      ", requireAllowlist ? "required" : "OFF - anyone may claim");
         console.log("merkle root    ", vm.toString(merkleRoot));
 
         vm.startBroadcast(deployerKey);
-        nft = new CPSC3640NFT(owner, merkleRoot, claimOpen, requireAllowlist);
+        address[6] memory images;
+        for (uint256 i; i < 6; i++) {
+            bytes memory image = vm.readFileBinary(string.concat("nft/cards/", vm.toString(i), ".jpg"));
+            images[i] = address(new CourseArtwork(image));
+            console.log("artwork", i, images[i]);
+        }
+        CourseRenderer renderer = new CourseRenderer(images);
+        nft = new CPSC3640NFT(owner, merkleRoot, claimOpen, requireAllowlist, renderer);
+        console.log("renderer", address(renderer));
         vm.stopBroadcast();
 
         console.log("CPSC3640NFT    ", address(nft));

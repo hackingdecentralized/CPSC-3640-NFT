@@ -1,542 +1,184 @@
 # CPSC 3640 / CPSC 5400 Course NFT
 
-A course collectible for **CPSC 3640 / CPSC 5400 - Decentralized Payments, Contracts,
-and Finance for Humans and AI**, Fall 2026.
+A Fall 2026 course collectible. Each wallet claims one ERC-721 on Ethereum Sepolia.
+Its original address and claim order select one of six base cards, an accent color,
+a small symbol, and an optional ring. The card also carries its unique claim number.
 
-Enrolled students connect a wallet, get checked against an on-chain allowlist, and mint
-one ERC-721 to themselves on Ethereum Sepolia. The point is to walk the whole path once,
-for real: visit a page, connect a wallet, notice you are on the wrong network, fix that,
-prove eligibility, sign a transaction, wait for a block, and end up owning something.
+**The final image and metadata are available immediately after minting, entirely
+on-chain. There is no IPFS, reveal, image server, or later publishing step.**
+The website reads the same `tokenURI` that wallets read; it does not generate a
+separate version of the student's card.
 
-Every token gets its own card: one of six designs, with its own background, border,
-halo, icons and badge, drawn from the token's claim number and the address that claimed
-it. The claim page draws the card the moment a student claims.
+This is a course collectible, not an official academic credential or a Yale-issued
+credential.
 
-Wallets see it in two phases:
+## How it works
 
-1. **Until the reveal**, `tokenURI` is fully on-chain: a 512x512 WebP of about 14 KB,
-   sitting in the contract's own bytecode, with the claim number composited on at read
-   time, so the third student to claim sees "No. 3". No IPFS, no backend, no database.
-   See `nft/README.md` for why that artwork is 512x512.
-2. **After the reveal**, the course staff generate every card, upload them to IPFS and
-   point the contract at them. Wallets then show each student the card the page showed
-   them. See [Revealing the cards](#revealing-the-cards).
+1. A student connects a wallet and switches to Sepolia.
+2. `claim(proof)` checks eligibility and the one-claim-per-address rule.
+3. The contract assigns `tokenId = ++totalMinted` and records `claimerOf[tokenId]`.
+4. `tokenURI(tokenId)` asks the fixed renderer for JSON containing an embedded SVG.
+5. The SVG embeds the selected JPEG base and draws the accent, symbol and number.
 
-> This is a collectible, not an official academic credential, and not a Yale-issued
-> anything. The metadata says so too.
-
-## For students: before you claim
-
-Three one-time steps. The claim page walks you through them, but here they are in full.
-
-**0. Install a wallet.** [MetaMask](https://metamask.io/download/) in Chrome, Firefox,
-Edge or Brave. Create a new wallet when it asks and keep the recovery phrase somewhere
-safe. You do not need to put any real money in it.
-
-**1. Switch to Sepolia.** Sepolia is Ethereum's test network, so nothing here costs real
-money. Connect on the claim page and it will offer to switch for you.
-
-**2. Get free test ETH.** The NFT is free, but Ethereum charges a small fee to process
-any transaction. Any Sepolia faucet works, for example:
-
-```text
-https://cloud.google.com/application/web3/faucet/ethereum/sepolia
-```
-
-Paste your address in and it sends you a small amount. The claim page shows your address
-with a copy button, and tells you when you have none.
-
-Then connect and claim. Your token's number is your place in the queue, and your card is
-drawn from that number and your wallet address, so you see it the moment your claim
-lands. Download it from the page if you like. Your wallet shows a placeholder, stamped
-with your number, until the course staff publish the collection.
+Handsome Dan has a 5% draw weight; each of the other five designs has 19%.
+These are per-draw probabilities, not guaranteed class-wide counts. The draw is derived from
+`keccak256(abi.encode("CPSC3640-onchain-v1", originalClaimer, tokenId))`.
+It is deterministic and publicly predictable, appropriate for a classroom collectible,
+not unpredictable prize allocation. Refreshing or transferring never changes the card.
+The order is the actual on-chain claim order, not the order students clicked a button.
+The website reads the weights from the renderer's deployment event, saved in
+`deployments/<network>.json`. An older equal-chance deployment keeps its original
+odds until a new renderer and NFT are deployed and the website is rebuilt.
 
 ## Architecture
 
-```
-                    main branch
-                         |
-        +----------------+----------------+
-        |                |                |
-    Solidity    Card generator     Web source
-        |           |    \             |
-        |           |     +--------->  |   same trait code and layers
-        v           v                  v
- Ethereum Sepolia  IPFS (at reveal)  Vite build
-        |                                 |
-        |                                 v
-        |                          gh-pages branch
-        |                                 |
-        +----------- browser -------------+
-                    |
-                    v
-               Student wallet
-                    |
-                    v
-                  claim()
-                    |
-                    v
-                  ERC-721
-```
+| Component | Responsibility |
+| --- | --- |
+| `CPSC3640NFT` | Ownership, one claim per address, optional roster, original claimer |
+| `CourseRenderer` | Fixed draw and SVG/JSON rendering; no owner or setters |
+| Six `CourseArtwork` data contracts | One compressed base card each, stored as immutable code |
+| Static Vite website | Wallet flow, base previews, and the actual image returned by the NFT |
 
-Three places, three jobs:
+Deployment creates eight contracts once. Each image is stored once for the whole
+class, not once per student. The NFT's renderer reference cannot change. Artwork
+contracts contain a STOP byte followed by image data; the renderer reads those bytes
+using `EXTCODECOPY`. Neither the renderer nor the artwork can be upgraded.
 
-| Where | Holds | Is the source of truth for |
-| --- | --- | --- |
-| `main` | Solidity, tests, artwork, generator, allowlist tooling, web source | everything a human writes, including which card each token gets |
-| Ethereum Sepolia | the deployed contract | who owns what, who claimed it, and where its metadata lives |
-| IPFS | the revealed collection | nothing new: it is generated from `main` and the chain |
-| `gh-pages` | built static site | nothing; it is disposable output |
+Base images are 512×512 JPEG, about 18–23 KB each, displayed inside a 1254×1254 SVG.
+This trades some original image detail for compact, self-contained artwork. The base
+files fit under the 24,576-byte runtime limit individually. Reading metadata costs
+roughly 7–9 million gas in local tests but uses a read-only RPC call, not a paid
+transaction. Claims do not render or store another copy of the image.
 
-## Trait-layered collection generator
+## Wallet display
 
-`generator/` renders the cards: five Yale designs, from Harkness Tower to the Beinecke
-Library, plus a rarer Handsome Dan edition. Each gets layered backgrounds, borders,
-halos, icons, badges and easter eggs, drawn deterministically from
-`SHA256(tokenId : claimer : salt)`. It writes 1024px PNGs and ERC-721 metadata. See [generator/README.md](generator/README.md).
+The standard ERC-721 metadata includes `name`, `description`, `attributes`, and an
+`image` data URI. Minting produces complete metadata without waiting for staff.
+Wallet discovery, indexing, caching and SVG/JPEG rendering still depend on the wallet.
 
-The claim page imports its trait code and the layer rasters it exports, so the page and
-the reveal cannot disagree about a card. The salt is public on purpose, which means a
-card can be predicted; the generator README explains that trade.
+For MetaMask on Sepolia, use **NFTs → Import NFT**, choose Sepolia, and enter the NFT
+contract address and token ID. Enable NFT media if hidden. The claim page exposes
+these values under **Show in my wallet**. Test the actual target extension/mobile
+version before distributing the collection; a successful browser render is not proof
+that every wallet supports this embedded format.
 
-## Repository layout
+## Setup and checks
 
-```
-contracts/CPSC3640NFT.sol      ERC-721, Merkle allowlist, on-chain metadata
-test/CPSC3640NFT.t.sol         Foundry tests
-script/Deploy.s.sol            deployment script
-script/Reveal.s.sol            owner actions for the reveal, run by scripts/reveal.sh
-deployments/                   public record of each deployment
-nft/course-nft.svg             master artwork; course-nft-onchain.webp is what ships on-chain
-allowlist/                     roster in, Merkle root and proofs out
-web/                           Vite + TypeScript + viem claim page
-scripts/                       deploy, verify, reveal, page publishing, artwork embedding
-generator/                     trait-layered card generator, shared with the claim page
-```
-
-## Setup
-
-Needs [Foundry](https://book.getfoundry.sh/getting-started/installation) and Node 20+.
-
-```bash
-git clone --recursive https://github.com/hackingdecentralized/CPSC-3640-NFT.git
-cd CPSC-3640-NFT
-npm install              # allowlist + tooling
-npm --prefix web install # claim page
-npm --prefix generator ci                    # card generator
-npm --prefix generator run prepare-assets    # 1024px bases and masks
-npm --prefix generator run export-web        # card layers for the claim page
-```
-
-The last three are what let the claim page draw cards. Without them the page still
-works: it shows the on-chain artwork where it can, and says so when it cannot draw a
-card.
-
-Already cloned without `--recursive`:
+Requires Node 20+ and Foundry.
 
 ```bash
 git submodule update --init --recursive
+npm ci
+npm --prefix web ci
+forge test -vv
+forge build --sizes
+npm run test:web
+npm --prefix web run build
 ```
 
-## How the claim flow works
-
-```
-wallet calls claim(proof)
-        |
-        v  is claiming open?          -> ClaimClosed
-        v  has this address claimed?  -> AlreadyClaimed
-        v  allowlist on?              -> if off, skip the next check
-        v  does the proof verify?     -> InvalidProof
-        v
-   mark address as claimed, record claimerOf[tokenId]
-        v
-   _safeMint(msg.sender, tokenId)     tokenId starts at 1
-        v
-   emit Claimed(account, tokenId)
-```
-
-Whether a proof is needed at all is a deploy-time choice, held in `allowlistEnabled` and
-changeable later by the owner. It is **off by default**: any address may claim one token,
-and the page never fetches `proofs.json`. One per wallet still holds, but one person can use several
-wallets, so an open claim is a collectible for whoever finds the page rather than a
-record of who was enrolled.
-
-With it on, eligibility is a Merkle proof. The contract stores one 32-byte root; the page
-holds the proofs. Leaves use OpenZeppelin's `StandardMerkleTree` encoding:
-
-```
-leaf   = keccak256(bytes.concat(keccak256(abi.encode(address))))
-parent = keccak256(sorted(left, right))
-```
-
-Both sides must agree exactly or every proof breaks. `allowlist/generate-merkle.ts`
-builds the tree, `MerkleProof` verifies it, and the Foundry tests run against proofs
-emitted by that script rather than against a tree rebuilt in Solidity. If the two
-encodings ever drift apart, the test suite finds out before Sepolia does.
-
-The page also asks the contract `isEligible` before it shows a claim button, so a
-tampered or stale `proofs.json` cannot produce a button that leads to a failed
-transaction.
-
-## Common commands
+The six compressed images are committed in `nft/cards/`, so normal builds and
+deployments need no image generator. To regenerate them from the supplied originals:
 
 ```bash
-npm run merkle                # build the Merkle tree from allowlist/addresses.json
-npm run merkle -- --example   # rebuild the committed test fixture
-npm run image                 # master artwork -> the 512px on-chain copy
-npm run embed:image           # that copy -> contracts/CourseArtwork.sol
-forge test -vv                # run the contract tests
-forge build --sizes           # check bytecode against the 24,576-byte limit
-npm --prefix web run dev      # claim page against Sepolia
-npm --prefix web run dev:anvil# claim page against local Anvil
-scripts/deploy.sh sepolia     # test, deploy and verify in one command
-scripts/verify.sh sepolia     # retry explorer verification on its own
-scripts/publish-pages.sh      # build and publish gh-pages
-scripts/reveal.sh sepolia status             # claims, reveal and freeze state
-scripts/reveal.sh sepolia publish <CID>      # reveal the uploaded collection
-scripts/reveal.sh sepolia close | open       # pause or resume claiming
-scripts/reveal.sh sepolia freeze             # make the final reveal permanent
+npm --prefix generator ci
+npm run image
 ```
 
-## Running it locally end to end
+This uses the pinned Sharp version and updates the images and their SHA-256 manifest.
+Image bytes are immutable once deployed. Regenerating files affects future deployments
+only. The older layered generator remains under `generator/` as historical tooling;
+it is not part of the current claim, build, or deployment flow.
 
-Four terminals' worth of work, in order.
+## Run locally
 
-**1. Start a chain and generate the allowlist.**
+Start Anvil in one terminal:
 
 ```bash
 anvil
-npm run merkle -- --example
 ```
 
-The example roster is Anvil's own accounts #0, #1, #3, #4 and #5. Account #2 is left out
-on purpose so you have an address that is genuinely not eligible.
-
-**2. Deploy.**
-
-Anvil prints ten private keys when it starts. Copy any one of them. `REQUIRE_ALLOWLIST=true`
-turns the example roster on, which is what makes account #2 ineligible below; without it,
-anyone may claim.
+In another, use a disposable Anvil test key:
 
 ```bash
-export DEPLOYER_PRIVATE_KEY=<a private key from the anvil startup output>
-REQUIRE_ALLOWLIST=true scripts/deploy.sh anvil
-```
-
-That writes `deployments/anvil.json`, which is what the claim page reads.
-
-**3. Run the page.**
-
-```bash
-npm --prefix generator run export-web   # once, so the page can draw cards
+export DEPLOYER_PRIVATE_KEY=<an Anvil test key>
+scripts/deploy.sh anvil
 npm --prefix web run dev:anvil
 ```
 
-**4. Add Anvil to MetaMask** as a network on `http://127.0.0.1:8545`, chain id `31337`,
-import a couple of Anvil private keys, and walk through it:
+Connect a local test wallet on chain 31337. Each account can claim once. The completed
+card comes directly from `tokenURI`, including after reload and transfer.
 
-| Wallet | Expected |
-| --- | --- |
-| Account #0 | eligible, claims, receives token #1 and sees its card |
-| Account #0 again, after reload | already claimed, the same card returns |
-| Account #1 | eligible, claims, receives token #2 and its own card |
-| Account #2 | not eligible, no claim button at all |
+## Deploy to Sepolia
 
-The card on the page is the one `npm --prefix generator run generate -- --token-id 1
---wallet <account #0>` renders.
-
-**5. Optionally, rehearse the reveal.** Follow [Revealing the cards](#revealing-the-cards)
-with `anvil` in place of `sepolia`. A local web server can stand in for IPFS: copy the
-two directories to `<root>/ipfs/<cid>/` under any made-up CIDs, serve `<root>`, and set
-`IPFS_GATEWAY` to that server.
-
-## Deploying to Sepolia
-
-**1. Configure secrets.** Copy `.env.example` to `.env` and fill it in. `.env` is
-git-ignored. Use a throwaway key that holds nothing but Sepolia test ETH.
-
-```bash
-cp .env.example .env
-```
-
-`SEPOLIA_RPC_URL` and `DEPLOYER_PRIVATE_KEY` are required. `ETHERSCAN_API_KEY` is
-optional but worth setting: with it, the source is verified on Etherscan as part of the
-deploy, with no second step.
-
-**2. Choose who may claim.** By default anyone may claim one token, so there is nothing
-to do here and you can go straight to step 3.
-
-To restrict it to a roster instead, put the wallet addresses in
-`allowlist/addresses.json`, addresses only and never names, emails or NetIDs, then build
-the tree and deploy with the flag set:
-
-```bash
-npm run merkle
-```
-
-```bash
-REQUIRE_ALLOWLIST=true scripts/deploy.sh sepolia
-```
-
-If `addresses.json` is missing the generator falls back to
-`allowlist/addresses.example.json`, five Anvil test accounts. Deploying that root would
-let those five test wallets claim and nobody else, so `scripts/deploy.sh` stops and asks
-before it lets you.
-
-**3. Deploy.**
+Copy `.env.example` to `.env` and set `DEPLOYER_PRIVATE_KEY` and `SEPOLIA_RPC_URL`.
+Use a disposable key containing only test ETH. `ETHERSCAN_API_KEY` enables explorer
+verification. Never put secrets into frontend settings or deployment records.
 
 ```bash
 scripts/deploy.sh sepolia
 ```
 
-That one command runs the tests, refuses to continue if any fail, checks the deployer
-has ETH, deploys, submits the source for verification, and writes
-`deployments/sepolia.json`. Add `--no-verify` to skip the explorer step.
-
-If the contract deploys but verification fails, which happens on rate limits or before
-the explorer has indexed the creation transaction, the deployment is still recorded and
-you can retry on its own:
-
-```bash
-scripts/verify.sh sepolia
-```
-
-`verify.sh` reads the constructor arguments back out of the deployment record rather
-than guessing them, so the bytecode lines up.
-
-The first Sepolia deployment, `0x91e67ce5...`, predates reveal support: its tokens will
-only ever show the on-chain artwork, and the page shows that artwork for it rather than
-cards. Its record says so (`"revealable": false`); `scripts/deploy.sh` records the
-answer for every new deployment, so the page knows before anyone connects. Generated cards need the current contract, which means a new deployment. Tokens
-minted on the old contract stay where they are.
-
-**4. Commit the deployment record and publish.**
+The script runs the contract tests, deploys the six artwork contracts, renderer and
+NFT, records their public addresses, and verifies the NFT and renderer when configured.
+Each artwork is a separate deployment transaction. The script uses `--slow` to wait
+for confirmation before sending the next transaction, including for EIP-7702 delegated
+wallets with a small pending-transaction limit. If a run fails partway through, keep
+the broadcast and cache files, keep the same deployer/configuration, and continue:
 
 ```bash
-git add deployments/sepolia.json && git commit -m "Record Sepolia deployment"
-scripts/publish-pages.sh
+scripts/deploy.sh sepolia --resume
 ```
 
-`deployments/sepolia.json` is the frontend's configuration. `web/src/config.ts` imports
-it, so updating that file and rebuilding is the whole of "update deployment config".
-No chain id or contract address is written anywhere else in the frontend.
-
-The deploy script refuses to run against Ethereum mainnet, as does `Deploy.s.sol`.
-
-## Updating the allowlist
-
-Enrollment changes are a root rotation. Nobody loses a token they already have.
-
-```
-allowlist/addresses.json
-        |
-        v  npm run merkle
-new root + new proofs.json
-        |
-        v  cast send $CONTRACT "setMerkleRoot(bytes32)" $NEW_ROOT
-contract now points at the new roster
-        |
-        v  scripts/publish-pages.sh
-site serves proofs matching the new root
-```
+This resumes the saved transaction plan; already-created contracts remain on-chain.
+Avoid other transactions from the deployer until it finishes, so the saved nonces
+remain valid. A fresh run is refused while the latest broadcast record is incomplete.
 
 ```bash
-# after editing allowlist/addresses.json
+scripts/verify.sh sepolia    # retry source verification
+scripts/publish-pages.sh    # build and publish the static claim page
+```
+
+`deployments/<network>.json` is the frontend configuration and records constructor
+arguments for verification. `onchainCards: true` is written only after the deployment
+creation code is matched to this build.
+
+**Migration:** the existing Sepolia deployment uses the previous reveal design and
+cannot be upgraded into this version. Deploy a new collection and publish the updated
+record. Existing NFTs remain in the old contract. Until the record is updated, the
+page labels the old artwork honestly and reads what that old contract actually returns.
+Old source verification and reveal administration require the original source revision.
+
+## Optional student roster
+
+Open claiming is the default: any address may claim once. This is one per wallet,
+not proof of one per person. To restrict eligibility, put wallet addresses only in
+`allowlist/addresses.json`:
+
+```bash
 npm run merkle
-source .env
-cast send "$CONTRACT_ADDRESS" "setMerkleRoot(bytes32)" \
-  "$(jq -r .merkleRoot allowlist/generated/root.json)" \
-  --rpc-url "$SEPOLIA_RPC_URL" --private-key "$DEPLOYER_PRIVATE_KEY"
-scripts/publish-pages.sh
+REQUIRE_ALLOWLIST=true scripts/deploy.sh sepolia
 ```
 
-Rotate the root and republish the site together. In between, students on the new roster
-hold proofs the contract does not recognise. The page detects exactly this and says the
-site is out of date rather than showing a button that would fail.
+The contract verifies OpenZeppelin StandardMerkleTree proofs. The fixture tests use
+proofs generated by the TypeScript tool, so incompatible encoding is caught locally.
+The owner can change the Merkle root, enable/disable the roster, or open/close claiming.
+Those actions do not alter existing cards. When rotating a roster, update the on-chain
+root and republish the matching proofs together. Never include student names or emails
+in the public allowlist.
 
-Put only wallet addresses in `addresses.json`. No names, no emails, no NetIDs, no Canvas
-identifiers. The file feeds a public Merkle tree and the proofs are served publicly.
+## Repository
 
-## Revealing the cards
-
-Until the reveal, wallets show the on-chain placeholder. The owner reveals by generating
-every claimed card, uploading it, and pointing the contract at it:
-
-```
-generator: npm run collection -- --network sepolia --expect <fingerprint>
-        |      reads totalMinted and claimerOf at the latest finalized block
-        v
-upload output/collection/sepolia/images            -> IMAGE_CID
-npm run set-image-cid -- --dir output/collection/sepolia --cid <IMAGE_CID>
-upload output/collection/sepolia/metadata          -> METADATA_CID
-        |
-        v
-scripts/reveal.sh sepolia publish <METADATA_CID>
-        |      checks every token and every uploaded file, then
-        |      setBaseURI("ipfs://<cid>/", count)
-        v
-tokens 1..count now read ipfs://<cid>/<id>.json
+```text
+contracts/                  NFT, immutable renderer, artwork data constructor
+nft/cards/                  six deployable JPEGs and their checksum manifest
+script/Deploy.s.sol         deployment of all eight contracts
+scripts/                    deploy, record, verify, publish
+web/                        static wallet/claim interface
+allowlist/                  roster-to-Merkle-proof tooling
+test/                       contract, image and metadata tests
+generator/assets/source/    original high-resolution card designs
 ```
 
-`<fingerprint>` is the "Collection" value in the claim page's footer. It covers the
-configuration, the code that draws cards and every layer's pixels, so if this checkout
-would generate different cards than the page showed, the command stops.
-
-The collection is read at Sepolia's latest finalized block, roughly 15 minutes back, so
-a chain reorganisation cannot reorder the claims it was drawn from. Newer claims wait
-for the next run.
-
-Before `publish` sends anything, it checks, for every token:
-
-- the chain still says it was claimed by the address its card was drawn from
-- its metadata file is in the upload, identical to the generated one
-- its image is in the upload, byte for byte
-
-A mismatch or a missing file stops it. Files a gateway cannot serve yet (common for a
-few minutes after an upload) get a warning and a question instead. Set `IPFS_GATEWAY` to
-your pinning service's gateway to read uploads back sooner, and `REVEAL_QUICK=1` to
-download only the first and last image and just confirm the rest exist.
-
-A reveal covers the tokens that existed when the collection was generated. Tokens
-claimed later keep the placeholder until the next reveal, so you can reveal as often as
-you like while claiming is open. To finish, close claiming, reveal once more, and
-freeze:
-
-```bash
-scripts/reveal.sh sepolia close
-# collection, upload, set-image-cid, upload, publish, as above
-scripts/reveal.sh sepolia freeze
-```
-
-Freezing is irreversible: the metadata location can never change again, and claiming
-can never reopen, because a token minted afterwards could never be revealed. The
-contract refuses to freeze until every token is revealed, and `freeze` first runs the
-same checks as `publish` against what the contract points at now.
-
-`reveal.sh` reads `DEPLOYER_PRIVATE_KEY` and `SEPOLIA_RPC_URL` from `.env`, and the key
-must be the contract owner's. `close` and `open` also work on the first deployment.
-
-## GitHub Pages and CI
-
-Publishing is a local, authenticated action: run `scripts/publish-pages.sh`. The script
-rebuilds the card layers, builds `web/dist`, commits exactly those files to `gh-pages`,
-and pushes. It never checks `gh-pages` out, so your working tree is never disturbed.
-
-Enable it once, in **Settings -> Pages -> Deploy from a branch -> gh-pages -> /(root)**.
-
-The included CI workflow runs tests and builds the site. It does **not** deploy, and that
-is deliberate. A workflow that pushes `gh-pages` using the default `GITHUB_TOKEN` will
-often appear to work and then not deploy: pushes made with that token do not trigger the
-branch-based Pages build. If you want deployment automated later, use GitHub's official
-Pages Actions flow (`actions/upload-pages-artifact` and `actions/deploy-pages`) and switch
-the Pages source to "GitHub Actions". Do not bolt a token-push workflow onto the
-branch-based setup and expect it to work.
-
-Never develop on `gh-pages`, and never merge it back into `main`. It is build output.
-Deleting and republishing it should always be safe.
-
-## Security notes
-
-The contract is the only thing enforcing anything.
-
-- **Eligibility is enforced on-chain.** `proofs.json` is a convenience for building the
-  proof argument. Editing it, or serving a different one, changes nothing: `claim`
-  verifies against the root in contract storage.
-- **One NFT per wallet, enforced on-chain** by `hasClaimed`, set before minting. A
-  transfer does not restore a claim.
-- **`_safeMint`**, so a token cannot be stranded in a contract that cannot handle it.
-- **`claim` is not payable.** There is no price, no withdrawal path, and no ETH held.
-- **No upgradeability, no proxy.** What is deployed is what was audited in class.
-- **The page requests only what it needs:** the account list, the chain id, one chain
-  switch, one transaction. No token approvals, no persistent permissions.
-- **No secrets reach the browser.** `DEPLOYER_PRIVATE_KEY` and the RPC URL are read by
-  Foundry from `.env` and are never referenced by any `VITE_`-prefixed variable, so Vite
-  cannot bundle them. `.env` is git-ignored; only `.env.example` is committed.
-- **The page shows the network and contract address** at all times, so students can check
-  what they are about to sign against.
-- **The deploy script refuses Ethereum mainnet** outright.
-- **The collection salt is public by design.** Anyone can work out which card a token id
-  and address would get. That is what lets the page draw cards without a server; the
-  cost is that rarity can be predicted. See `generator/README.md`.
-- **A reveal is checked before it is sent.** `scripts/reveal.sh` compares every token's
-  claimer with the chain and every uploaded file with the generated one before it
-  publishes or freezes, and the contract only accepts a reveal that covers tokens which
-  exist.
-- **No secret goes on a command line**, where other processes on the machine could read
-  it. The scripts pass the key, the Sepolia endpoint and the Etherscan key to Foundry
-  through the environment, and the endpoint through a `sepolia` alias in
-  `foundry.toml`.
-
-If a private key ever does reach a commit, rotating the file is not enough. Treat the key
-as compromised, move the contract owner to a fresh key, and rewrite history.
-
-## Contract reference
-
-`CPSC3640NFT`, symbol `CPSC3640`. Solidity 0.8.24, OpenZeppelin 5.x.
-
-| Function | Who | Does |
-| --- | --- | --- |
-| `claim(bytes32[] proof)` | anyone on the allowlist | mints one token to the caller |
-| `canClaim(address)` | view | could this address claim right now |
-| `isEligible(address, bytes32[])` | view | does this proof verify |
-| `claimerOf(uint256)` | view | who claimed a token; its card is drawn from this |
-| `tokenURI(uint256)` | view | revealed metadata, or the on-chain placeholder |
-| `imageURI(uint256)` | view | the placeholder artwork, claim number composited in |
-| `rawImage()` | view | the raw stored artwork bytes |
-| `revealedCount()`, `baseURI()`, `metadataFrozen()` | view | reveal state |
-| `setMerkleRoot(bytes32)` | owner | rotate the allowlist |
-| `setClaimOpen(bool)` | owner | open or pause claiming; never reopens once frozen |
-| `setAllowlistEnabled(bool)` | owner | require a proof, or let anyone claim |
-| `setBaseURI(string, uint256 count)` | owner | reveal tokens `1..count`, or `("", 0)` to undo |
-| `freezeMetadata()` | owner | make the reveal permanent and end claiming |
-
-Events: `Claimed(address indexed account, uint256 indexed tokenId)`,
-`MerkleRootUpdated`, `ClaimOpenUpdated`, `AllowlistEnabledUpdated`,
-`BaseURIUpdated(string, uint256)`, `MetadataFrozen(string)`, and ERC-4906's
-`BatchMetadataUpdate`, which tells marketplaces to refresh.
-
-Errors: `ClaimClosed`, `AlreadyClaimed`, `InvalidProof`, `MerkleRootNotSet`,
-`UnsupportedChain`, `InvalidReveal`, `RevealIncomplete`, `MetadataIsFrozen`.
-
-The constructor refuses to deploy anywhere except Sepolia (11155111) or a local node
-(31337). Scripts and config files can be edited or bypassed with a direct `forge create`;
-that check cannot, and deployment is the only moment it can be enforced for good.
-
-Tokens are ordinary transferable ERC-721s. A non-transferable badge would be a different
-contract with different semantics, not a flag on this one.
-
-## What `tokenURI` returns
-
-Before its reveal:
-
-```
-tokenURI(1)
-  -> data:application/json;base64,...
-       {
-         "name": "CPSC 3640/5400 - Fall 2026 #1",
-         "description": "Decentralized Payments, Contracts, and Finance for Humans and AI...",
-         "attributes": [ Course, Semester, Type, Network, Claim Number ],
-         "image": "data:image/svg+xml;base64,..."     <- SVG wrapping the stored
-                                                         WebP plus this token's
-                                                         claim number
-       }
-```
-
-After it:
-
-```
-tokenURI(1)
-  -> ipfs://<METADATA_CID>/1.json
-       {
-         "name": "CPSC 3640 / CPSC 5400 Course NFT #0001",
-         "image": "ipfs://<IMAGE_CID>/1.png",
-         "attributes": [ Base Template, Background, Border, Halo, Badge, ... ]
-       }
-```
-
-Decode one yourself:
-
-```bash
-cast call "$CONTRACT_ADDRESS" "tokenURI(uint256)(string)" 1 --rpc-url "$SEPOLIA_RPC_URL" \
-  | sed 's/^"//; s/"$//; s|^data:application/json;base64,||' | base64 -d | jq .
-```
+CI verifies image reproducibility, all contract tests, frontend metadata parsing and
+the production build. GitHub Pages publishing is explicit through
+`scripts/publish-pages.sh`; `gh-pages` remains disposable build output.

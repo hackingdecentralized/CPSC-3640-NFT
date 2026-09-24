@@ -214,3 +214,7 @@ a { color: var(--amber); }
 .disclaimer { margin-top: 18px; text-align: center; color: var(--muted); font-size: 12.5px; }
 .disclaimer a { color: var(--muted); text-decoration: none; }
 .disclaimer a:hover { color: var(--amber); text-decoration: underline; }
+
+.wallet-import { font-size: .85rem; }
+.wallet-import summary { cursor: pointer; }
+.wallet-import .mono { overflow-wrap: anywhere; }

@@ -26,17 +26,21 @@ let resizeBound = false;
 
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export function slideshowHtml(designs: Design[] | undefined, escape: (value: string) => string): string {
+export function slideshowHtml(designs: Design[] | undefined, escape: (value: string) => string, weights?: readonly number[] | null): string {
   if (!designs) {
     return `<div class="slideshow" aria-hidden="true">
       <div class="slide-stage"><div class="slides"><div class="slide"><div class="tile"></div></div></div></div>
       <p class="slide-caption">&nbsp;</p>
     </div>`;
   }
+  const weighted = weights?.length === designs.length &&
+    weights.every(w => Number.isInteger(w) && w >= 0 && w <= 100) &&
+    weights.reduce((a, b) => a + b, 0) === 100;
+  const chances = designs.map((_, i) => weighted ? `${weights![i]}% chance` : "Equal chance");
   const slides = designs
     .map(
-      ({label, odds, sample}, i) => `<figure class="slide" aria-roledescription="slide"
-        aria-label="${escape(label)}, ${odds}% of cards" data-label="${escape(label)}" data-odds="${odds}">
+      ({label, sample}, i) => `<figure class="slide" aria-roledescription="slide"
+        aria-label="${escape(label)}, ${chances[i]}" data-label="${escape(label)}" data-chance="${chances[i]}">
         <img src="${sample}" alt="Example ${escape(label)} card" width="1024" height="1024"
           ${i === 0 ? 'fetchpriority="high"' : 'fetchpriority="low"'} />
       </figure>`
@@ -53,7 +57,7 @@ export function slideshowHtml(designs: Design[] | undefined, escape: (value: str
       <button type="button" class="slide-nav prev" data-step="-1" aria-label="Previous design">&#8249;</button>
       <button type="button" class="slide-nav next" data-step="1" aria-label="Next design">&#8250;</button>
     </div>
-    <p class="slide-caption"><strong>${escape(designs[0]!.label)}</strong> <span>${designs[0]!.odds}% of cards</span></p>
+    <p class="slide-caption"><strong>${escape(designs[0]!.label)}</strong> <span>${chances[0]}</span></p>
     <div class="slide-dots">${dots}</div>
   </div>`;
 }
@@ -78,7 +82,7 @@ function reflect(host: ParentNode): void {
     const name = document.createElement("strong");
     name.textContent = figure.dataset.label ?? "";
     const odds = document.createElement("span");
-    odds.textContent = `${figure.dataset.odds}% of cards`;
+    odds.textContent = figure.dataset.chance ?? "";
     caption.append(name, " ", odds);
   }
   show.querySelectorAll<HTMLElement>(".slide-dots button").forEach((dot, i) => {

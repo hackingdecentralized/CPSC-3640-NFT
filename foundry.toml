@@ -11,9 +11,7 @@ via_ir = false
 bytecode_hash = "none"
 evm_version = "cancun"
 
-# `forge test` reads nft/course-nft-onchain.webp to prove the on-chain copy has not
-# drifted, and allowlist/generated/*.json to test against proofs from the real JS
-# generator. It reads those named files only; other files in nft/ are ignored.
+# Tests and deployment read the committed card bytes and public Merkle fixtures.
 fs_permissions = [
     {access = "read", path = "./nft"},
     {access = "read", path = "./allowlist/generated"},

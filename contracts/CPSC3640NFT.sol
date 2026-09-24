@@ -2,34 +2,19 @@
 pragma solidity ^0.8.24;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import {IERC4906} from "@openzeppelin/contracts/interfaces/IERC4906.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
-import {CourseArtwork} from "./CourseArtwork.sol";
+import {CourseRenderer} from "./CourseRenderer.sol";
 
 /// @title CPSC 3640/5400 Course NFT
 /// @notice A course collectible for CPSC 3640 / CPSC 5400 --
 ///         Decentralized Payments, Contracts, and Finance for Humans and AI, Fall 2026.
-/// @dev Two phases.
-///
-///      Before reveal, artwork and metadata are stored entirely on-chain: `tokenURI`
-///      returns a Base64 `data:application/json` URI embedding the course artwork.
-///      Nothing depends on IPFS or on any web server.
-///
-///      At reveal, the owner points `baseURI` at the generated collection, and the
-///      metadata of tokens 1..`revealedCount` becomes `baseURI + tokenId + ".json"`.
-///      Tokens claimed after that keep the on-chain placeholder until the next reveal
-///      covers them. Each card is drawn from its token id and the address that
-///      claimed it, which is why `claimerOf` is recorded. `freezeMetadata` makes the
-///      final reveal permanent.
-///
-///      This is a collectible, NOT an official academic credential.
-contract CPSC3640NFT is IERC4906, ERC721, Ownable {
-    using Strings for uint256;
+/// @dev Each claim permanently records its original wallet and sequential token id.
+///      The immutable renderer returns the final card immediately; no reveal or URLs.
+contract CPSC3640NFT is ERC721, Ownable {
+    CourseRenderer public immutable renderer;
+    error InvalidRenderer();
 
     // ---------------------------------------------------------------------
     // Errors
@@ -45,14 +30,6 @@ contract CPSC3640NFT is IERC4906, ERC721, Ownable {
     error MerkleRootNotSet();
     /// @notice Deployment was attempted on a chain this contract is not meant for.
     error UnsupportedChain(uint256 chainId);
-    /// @notice The metadata location has been frozen and can no longer change.
-    error MetadataIsFrozen();
-    /// @notice A reveal must cover at least one and at most every minted token, and
-    ///         needs a location exactly when it covers any.
-    error InvalidReveal();
-    /// @notice Freezing requires every minted token to be revealed.
-    error RevealIncomplete(uint256 revealedCount, uint256 totalMinted);
-
     // ---------------------------------------------------------------------
     // Events
     // ---------------------------------------------------------------------
@@ -66,11 +43,6 @@ contract CPSC3640NFT is IERC4906, ERC721, Ownable {
     event ClaimOpenUpdated(bool isOpen);
     /// @notice Emitted when the owner turns the allowlist requirement on or off.
     event AllowlistEnabledUpdated(bool isEnabled);
-    /// @notice Emitted when the owner points tokens 1..`revealedCount` at new metadata.
-    event BaseURIUpdated(string baseURI, uint256 revealedCount);
-    /// @notice Emitted once, when the metadata location becomes permanent.
-    event MetadataFrozen(string baseURI);
-
     // ---------------------------------------------------------------------
     // Storage
     // ---------------------------------------------------------------------
@@ -101,15 +73,6 @@ contract CPSC3640NFT is IERC4906, ERC721, Ownable {
     ///         token's generated card is derived from who claimed it, not who holds it.
     mapping(uint256 tokenId => address) public claimerOf;
 
-    /// @notice Where revealed metadata lives, e.g. `ipfs://<cid>/`. Empty until reveal.
-    string public baseURI;
-
-    /// @notice Tokens 1..revealedCount read their metadata from `baseURI`. Zero until reveal.
-    uint256 public revealedCount;
-
-    /// @notice Once true, `baseURI` can never change again.
-    bool public metadataFrozen;
-
     // ---------------------------------------------------------------------
     // Where this contract is allowed to exist
     // ---------------------------------------------------------------------
@@ -128,15 +91,14 @@ contract CPSC3640NFT is IERC4906, ERC721, Ownable {
     /// @param initialClaimOpen Whether claiming starts open.
     /// @param requireAllowlist Whether a Merkle proof is required. Pass false to let
     ///        anyone claim one token.
+    /// @param cardRenderer Fixed renderer referencing the six immutable base cards.
     constructor(
         address initialOwner,
         bytes32 initialMerkleRoot,
         bool initialClaimOpen,
-        bool requireAllowlist
-    )
-        ERC721("CPSC 3640/5400 Course NFT", "CPSC3640")
-        Ownable(initialOwner)
-    {
+        bool requireAllowlist,
+        CourseRenderer cardRenderer
+    ) ERC721("CPSC 3640/5400 Course NFT", "CPSC3640") Ownable(initialOwner) {
         // The course runs on Sepolia, and deployment is the only moment that can be
         // enforced for good. Scripts and config files can be edited or bypassed with a
         // direct `forge create`; this check cannot. Anything that is not Sepolia or a
@@ -145,6 +107,8 @@ contract CPSC3640NFT is IERC4906, ERC721, Ownable {
             revert UnsupportedChain(block.chainid);
         }
 
+        if (address(cardRenderer).code.length == 0) revert InvalidRenderer();
+        renderer = cardRenderer;
         merkleRoot = initialMerkleRoot;
         claimOpen = initialClaimOpen;
         allowlistEnabled = requireAllowlist;
@@ -213,9 +177,8 @@ contract CPSC3640NFT is IERC4906, ERC721, Ownable {
         emit MerkleRootUpdated(previous, newRoot);
     }
 
-    /// @notice Open or close claiming. A frozen collection can never reopen.
+    /// @notice Open or close claiming.
     function setClaimOpen(bool isOpen) external onlyOwner {
-        if (isOpen && metadataFrozen) revert MetadataIsFrozen();
         claimOpen = isOpen;
         emit ClaimOpenUpdated(isOpen);
     }
@@ -228,103 +191,15 @@ contract CPSC3640NFT is IERC4906, ERC721, Ownable {
         emit AllowlistEnabledUpdated(isEnabled);
     }
 
-    // ---------------------------------------------------------------------
-    // Reveal
-    // ---------------------------------------------------------------------
-
-    /// @notice Point tokens 1..`count` at generated metadata, or pass ("", 0) to go back
-    ///         to the on-chain placeholder. Only possible until the metadata is frozen.
-    /// @param newBaseURI Location of `<tokenId>.json` files, ending in "/".
-    /// @param count How many tokens that location holds. A token claimed after the
-    ///        collection was generated is not in it, so it keeps the placeholder.
-    function setBaseURI(string calldata newBaseURI, uint256 count) external onlyOwner {
-        if (metadataFrozen) revert MetadataIsFrozen();
-        if (count > totalMinted || (count == 0) != (bytes(newBaseURI).length == 0)) revert InvalidReveal();
-        baseURI = newBaseURI;
-        revealedCount = count;
-        emit BaseURIUpdated(newBaseURI, count);
-        // ERC-4906: tells marketplaces to refetch every existing token.
-        if (totalMinted > 0) emit BatchMetadataUpdate(1, totalMinted);
-    }
-
-    /// @notice Make the current reveal permanent and end claiming. Irreversible.
-    /// @dev Requires every minted token to be revealed, so close claiming, reveal, then
-    ///      freeze. Claiming ends for good because a token minted afterwards could
-    ///      never be revealed: an IPFS directory cannot gain files after upload.
-    function freezeMetadata() external onlyOwner {
-        uint256 minted = totalMinted;
-        if (revealedCount == 0 || revealedCount != minted) revert RevealIncomplete(revealedCount, minted);
-        metadataFrozen = true;
-        claimOpen = false;
-        emit ClaimOpenUpdated(false);
-        emit MetadataFrozen(baseURI);
-    }
-
-    /// @dev ERC-4906 is advertised so marketplaces listen for metadata updates.
-    function supportsInterface(bytes4 interfaceId) public view override(ERC721, IERC165) returns (bool) {
-        return interfaceId == bytes4(0x49064906) || super.supportsInterface(interfaceId);
-    }
-
-    // ---------------------------------------------------------------------
-    // On-chain metadata
-    // ---------------------------------------------------------------------
-
-    /// @notice ERC-721 metadata for `tokenId`: its generated card once a reveal covers
-    ///         it, otherwise the fully on-chain placeholder.
+    /// @notice Final metadata, available as soon as the token exists.
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         _requireOwned(tokenId);
-
-        if (tokenId <= revealedCount) return string.concat(baseURI, tokenId.toString(), ".json");
-
-        string memory json = string.concat(
-            '{"name":"CPSC 3640/5400 - Fall 2026 #',
-            tokenId.toString(),
-            '","description":"Decentralized Payments, Contracts, and Finance for Humans and AI. ',
-            "Fall 2026. A course collectible, not an official academic credential.",
-            '","attributes":[',
-            '{"trait_type":"Course","value":"CPSC 3640/5400"},',
-            '{"trait_type":"Semester","value":"Fall 2026"},',
-            '{"trait_type":"Type","value":"Course NFT"},',
-            '{"trait_type":"Network","value":"Ethereum"},',
-            '{"trait_type":"Claim Number","display_type":"number","value":',
-            tokenId.toString(),
-            "}",
-            '],"image":"',
-            imageURI(tokenId),
-            '"}'
-        );
-
-        return string.concat("data:application/json;base64,", Base64.encode(bytes(json)));
+        return renderer.tokenURI(tokenId, claimerOf[tokenId]);
     }
 
-    /// @notice The artwork for `tokenId`, with its claim number stamped on it.
-    /// @dev The stored artwork is one fixed image. The per-token badge is composited
-    ///      here, at read time, by wrapping that image in an SVG and drawing the number
-    ///      over it. Every token therefore has a distinct image without storing a
-    ///      distinct image, and without anything being uploaded anywhere.
-    function imageURI(uint256 tokenId) public pure returns (string memory) {
-        string memory svg = string.concat(
-            "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1254 1254' width='1254' height='1254'>",
-            "<image width='1254' height='1254' href='data:image/webp;base64,",
-            Base64.encode(CourseArtwork.image()),
-            "'/>",
-            "<g><rect x='985' y='1068' width='184' height='72' rx='36' fill='#17161c' ",
-            "fill-opacity='0.88' stroke='#e8a33d' stroke-width='3'/>",
-            "<text x='1077' y='1115' text-anchor='middle' font-family='Helvetica,Arial,sans-serif' ",
-            "font-size='34' font-weight='700' fill='#e8a33d' letter-spacing='2'>No. ",
-            tokenId.toString(),
-            "</text></g></svg>"
-        );
-        return string.concat("data:image/svg+xml;base64,", Base64.encode(bytes(svg)));
-    }
-
-    /// @notice The raw image bytes of the artwork.
-    /// @dev Byte-for-byte identical to `nft/course-nft-onchain.webp`, which
-    ///      `scripts/make-onchain-image.py` derives from the master artwork in
-    ///      `nft/course-nft.svg`. `test/CPSC3640NFT.t.sol` reads the file and asserts
-    ///      they match, so the two cannot silently drift. Regenerate the Solidity copy
-    ///      with `npm run embed:image`.
-    function rawImage() public pure returns (bytes memory) {
-        return CourseArtwork.image();
+    /// @notice The same image embedded in tokenURI.
+    function imageURI(uint256 tokenId) external view returns (string memory) {
+        _requireOwned(tokenId);
+        return renderer.imageURI(tokenId, claimerOf[tokenId]);
     }
 }

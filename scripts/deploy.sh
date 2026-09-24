@@ -5,6 +5,7 @@
 #   scripts/deploy.sh sepolia
 #   scripts/deploy.sh anvil          # local, no verification
 #   scripts/deploy.sh sepolia --no-verify
+#   scripts/deploy.sh sepolia --resume  # continue a partial deployment
 #
 # Reads secrets from .env, which is git-ignored and never reaches the browser.
 # Refuses to deploy if the tests do not pass or the allowlist is missing.
@@ -15,12 +16,44 @@ cd "$(git rev-parse --show-toplevel)"
 . scripts/lib.sh
 
 NETWORK="${1:-}"
-[ -n "$NETWORK" ] || die "usage: scripts/deploy.sh <sepolia|anvil> [--no-verify]"
+[ -n "$NETWORK" ] || die "usage: scripts/deploy.sh <sepolia|anvil> [--no-verify] [--resume]"
+shift
 VERIFY=1
-[ "${2:-}" = "--no-verify" ] && VERIFY=0
+RESUME=0
+for option in "$@"; do
+  case "$option" in
+    --no-verify) VERIFY=0 ;;
+    --resume) RESUME=1 ;;
+    *) die "unknown option '$option'" ;;
+  esac
+done
 
 use_network "$NETWORK"
 [ "$CHAIN_ID" = 31337 ] && VERIFY=0
+
+# Preserve a partially broadcast plan: a fresh run would replace run-latest.json
+# and deploy another set of image stores at different nonces.
+node - "$CHAIN_ID" "$RESUME" "$NETWORK" <<'JS'
+const fs = require('node:fs');
+const [chain, resume, network] = process.argv.slice(2);
+const path = `broadcast/Deploy.s.sol/${chain}/run-latest.json`;
+if (!fs.existsSync(path)) {
+  if (resume === '1') {
+    console.error(`No deployment to resume: ${path}`);
+    process.exit(1);
+  }
+} else if (resume !== '1') {
+  const record = JSON.parse(fs.readFileSync(path, 'utf8'));
+  const transactions = record.transactions ?? [];
+  const confirmed = new Set((record.receipts ?? [])
+    .filter(receipt => Number(receipt.status) === 1)
+    .map(receipt => receipt.transactionHash));
+  if (transactions.some(tx => tx.hash) && transactions.some(tx => !confirmed.has(tx.hash))) {
+    console.error(`A partial deployment exists. Continue it with: scripts/deploy.sh ${network} --resume`);
+    process.exit(1);
+  }
+}
+JS
 
 # 1. Secrets ------------------------------------------------------------------
 load_env "$NETWORK" 1
@@ -70,34 +103,26 @@ else
   fi
 fi
 
-# 4. Deploy, verifying as part of the same run --------------------------------
-say "Deploying to $NETWORK"
-set -- forge script script/Deploy.s.sol --rpc-url "$FORGE_RPC" --broadcast
-if [ "$VERIFY" -eq 1 ]; then
-  # --verify submits the source once the creation transaction is mined, so a
-  # successful run leaves a verified contract with no second step. forge reads
-  # ETHERSCAN_API_KEY from the environment.
-  set -- "$@" --verify --chain "$CHAIN_ID"
-fi
-
-if "$@"; then
-  DEPLOY_OK=1
+# 4. Deploy the image stores, renderer and NFT --------------------------------
+if [ "$RESUME" -eq 1 ]; then
+  say "Resuming saved deployment to $NETWORK"
 else
-  DEPLOY_OK=0
+  say "Deploying to $NETWORK"
 fi
+# Delegated (EIP-7702) accounts can have a very small pending-transaction limit.
+# Wait for each receipt before sending the next deployment transaction.
+set -- forge script script/Deploy.s.sol --rpc-url "$FORGE_RPC" --broadcast --slow
+[ "$RESUME" -eq 0 ] || set -- "$@" --resume
 
-# 5. Record it, whether or not verification succeeded -------------------------
-# The contract may well be live even if the explorer submission failed, so the
-# deployment record is written either way and verification can be retried.
-say "Recording deployment"
-node scripts/save-deployment.mjs "$NETWORK" "$CHAIN_ID"
-
-if [ "$DEPLOY_OK" -eq 0 ]; then
-  warn "The forge run reported a failure."
-  warn "If the contract deployed but verification failed, retry with:"
-  warn "  scripts/verify.sh $NETWORK"
+if ! "$@"; then
+  warn "Deployment did not complete. Existing deployment records have been kept."
+  warn "Continue the saved plan with: scripts/deploy.sh $NETWORK --resume"
   exit 1
 fi
+
+# 5. Record successful NFT creation before optional explorer verification -----
+say "Recording deployment"
+node scripts/save-deployment.mjs "$NETWORK" "$CHAIN_ID"
 
 ADDRESS="$(python3 -c "import json;print(json.load(open('deployments/$NETWORK.json'))['contractAddress'])")"
 cat <<DONE
@@ -110,5 +135,5 @@ Next:
   scripts/publish-pages.sh
 DONE
 if [ "$VERIFY" -eq 1 ]; then
-  echo "Source verification was submitted as part of the deploy."
+  scripts/verify.sh "$NETWORK"
 fi

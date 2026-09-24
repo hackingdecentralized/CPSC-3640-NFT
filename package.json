@@ -10,8 +10,8 @@
     "web:dev": "npm --prefix web run dev",
     "web:build": "npm --prefix web run build",
     "publish:pages": "bash scripts/publish-pages.sh",
-    "embed:image": "node scripts/embed-image.mjs",
-    "image": "python3 scripts/make-onchain-image.py"
+    "image": "npm --prefix generator run prepare-onchain",
+    "test:web": "node --import tsx --test web/test/*.test.ts"
   },
   "devDependencies": {
     "@openzeppelin/merkle-tree": "^1.0.7",
